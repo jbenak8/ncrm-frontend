@@ -1,0 +1,9 @@
+node_modules
+dist
+.env
+.env.local
+*.log
+.idea
+api-docs.json
+schemas.json
+.output.txt

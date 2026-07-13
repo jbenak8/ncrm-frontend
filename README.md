@@ -1,2 +1,41 @@
 # ncrm-frontend
-React based frontend for nCRM application.
+
+React based frontend for nCRM application (React 18 + Material UI 6 + Vite).
+
+## Funkce
+
+- **Přihlašování** — HTTP Basic proti backend profilu `local` (uživatelé `owner` / `rep` / `customer`, heslo `test`), nebo **Keycloak** (JWT) pro profil `prod`.
+- **Dashboard dle role** — majitel (OWNER) vidí souhrn, grafy objednávek/tržeb, top zákazníky a výkon zástupců; obchodní zástupce vidí své schůzky a objednávky.
+- **Zákazníci** — stránkovaný seznam s vyhledáváním, detail (kontaktní osoby, provozovny, objednávky, schůzky), zakládání a editace s **doplněním dat z ARES** podle IČO.
+- **Objednávky** — seznam s rozbalitelnými položkami, vytváření, změny stavu (workflow NEW → CONFIRMED → IN_PROGRESS → COMPLETED / CANCELLED).
+- **Schůzky** — plánování, editace, dokončení s výsledkem, zrušení.
+- **Kampaně** (pouze OWNER) — vytváření s **AI generováním obsahu** (Claude / ChatGPT), odesílání, přehled příjemců a stavu doručení.
+- **Katalog položek** — přehled zboží a služeb s filtrováním dle kategorií.
+- **Administrace základních dat** (pouze OWNER) — správa vlastních **společností** (CRUD, nastavení výchozí, doplnění z ARES), **zemí**, **sazeb DPH** a **obchodních zástupců**.
+- **Výběr společnosti** — po přihlášení vlastníka se automaticky použije výchozí společnost; pokud žádná není označena jako výchozí, zobrazí se dialog pro výběr, a pokud žádná neexistuje, varování s výzvou k založení (je-li navíc prázdný seznam zemí, je uživatel nejprve vyzván k přidání země). Přepínání společností je dostupné v hlavním menu i v menu uživatele (pouze OWNER — zákazníci a obchodní zástupci jsou přiřazeni konkrétní společnosti).
+- **Uživatelé** (pouze OWNER) — zakládání, editace a mazání účtů, zamknutí/odemknutí a povolení/zakázání.
+- **Reporty** — stažení PDF reportů (přehled prodejů, výkon zástupce, objednávky zákazníka).
+- Patička s copyrightem a verzí aplikace na každé obrazovce.
+
+## Spuštění
+
+Vyžaduje Node.js 18+. Backend musí běžet na `http://localhost:8080` (dev server jej proxuje přes `/api`).
+
+```bash
+npm install
+npm run dev      # http://localhost:3000
+npm run build    # produkční build do dist/
+```
+
+## Konfigurace
+
+Viz `.env.example`:
+
+| Proměnná | Význam |
+|---|---|
+| `VITE_AUTH_MODE` | `basic` (výchozí, lokální profil backendu) nebo `keycloak` |
+| `VITE_KEYCLOAK_URL` | URL Keycloak serveru |
+| `VITE_KEYCLOAK_REALM` | Keycloak realm |
+| `VITE_KEYCLOAK_CLIENT_ID` | Keycloak client id |
+
+Dev server běží na portu **3000**, který je povolen v CORS konfiguraci backendu.
