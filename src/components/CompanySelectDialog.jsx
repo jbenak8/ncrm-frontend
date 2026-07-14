@@ -43,7 +43,10 @@ export default function CompanySelectDialog() {
     client
       .get('/countries')
       .then(({ data }) => {
-        if (!cancelled) setHasCountries(data.length > 0);
+        // Defensive: the endpoint returns an array, but tolerate paged responses too,
+        // so an unexpected shape never results in a false "no country" warning.
+        const countries = Array.isArray(data) ? data : data?.content || [];
+        if (!cancelled) setHasCountries(countries.length > 0);
       })
       .catch(() => {
         // On error do not block company creation with the countries warning.
@@ -54,12 +57,10 @@ export default function CompanySelectDialog() {
     };
   }, [noCompanyExists]);
 
-  // Do not block the administration pages themselves, otherwise the first
-  // country or company could never be created.
-  if (
-    location.pathname.startsWith('/admin/companies') ||
-    location.pathname.startsWith('/admin/countries')
-  ) {
+  // Do not block any administration page (countries, companies, VAT rates,
+  // sales representatives, users), otherwise basic data could never be managed
+  // and the warning dialogs would wrongly pop up over these functions.
+  if (location.pathname.startsWith('/admin') || location.pathname.startsWith('/users')) {
     return null;
   }
 

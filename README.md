@@ -4,16 +4,20 @@ React based frontend for nCRM application (React 18 + Material UI 6 + Vite).
 
 ## Funkce
 
-- **Přihlašování** — HTTP Basic proti backend profilu `local` (uživatelé `owner` / `rep` / `customer`, heslo `test`), nebo **Keycloak** (JWT) pro profil `prod`.
+- **Přihlašování** — HTTP Basic proti backend profilu `local` (uživatelé `owner` / `rep` / `customer`, heslo `test`), nebo **Keycloak** (JWT) pro profil `prod`. Při přihlášení se kontrolují flagy účtu (zakázaný, zamknutý, vypršelé heslo, vynucená změna hesla) — při vynucené změně hesla se zobrazí blokující dialog (původní heslo, nové heslo 2×) s politikou hesel (min. 8 znaků, velké i malé písmeno, číslice a speciální znak).
 - **Dashboard dle role** — majitel (OWNER) vidí souhrn, grafy objednávek/tržeb, top zákazníky a výkon zástupců; obchodní zástupce vidí své schůzky a objednávky.
 - **Zákazníci** — stránkovaný seznam s vyhledáváním, detail (kontaktní osoby, provozovny, objednávky, schůzky), zakládání a editace s **doplněním dat z ARES** podle IČO.
 - **Objednávky** — seznam s rozbalitelnými položkami, vytváření, změny stavu (workflow NEW → CONFIRMED → IN_PROGRESS → COMPLETED / CANCELLED).
 - **Schůzky** — plánování, editace, dokončení s výsledkem, zrušení.
-- **Kampaně** (pouze OWNER) — vytváření s **AI generováním obsahu** (Claude / ChatGPT), odesílání, přehled příjemců a stavu doručení.
+- **Kampaně** (pouze OWNER) — vytváření s **AI generováním obsahu** (výběr chatbota Claude / ChatGPT), odesílání, přehled příjemců a stavu doručení.
+- **AI chat** — přímá diskuse s vybraným AI chatbotem (Claude / ChatGPT) z hlavního menu.
+- **Vyhledávání dle kritérií** — u tabulek (zákazníci, objednávky, schůzky, položky, kampaně, uživatelé) lze skládat filtry `pole – operátor – hodnota` nad novým generickým search API (`filter=field:operator:value`).
+- **Progress indikátory** — při načítání dat se zobrazuje indikátor průběhu.
 - **Katalog položek** — přehled zboží a služeb s filtrováním dle kategorií.
 - **Administrace základních dat** (pouze OWNER) — správa vlastních **společností** (CRUD, nastavení výchozí, doplnění z ARES), **zemí**, **sazeb DPH** a **obchodních zástupců**.
 - **Výběr společnosti** — po přihlášení vlastníka se automaticky použije výchozí společnost; pokud žádná není označena jako výchozí, zobrazí se dialog pro výběr, a pokud žádná neexistuje, varování s výzvou k založení (je-li navíc prázdný seznam zemí, je uživatel nejprve vyzván k přidání země). Přepínání společností je dostupné v hlavním menu i v menu uživatele (pouze OWNER — zákazníci a obchodní zástupci jsou přiřazeni konkrétní společnosti).
-- **Uživatelé** (pouze OWNER) — zakládání, editace a mazání účtů, zamknutí/odemknutí a povolení/zakázání.
+- **Uživatelé** (pouze OWNER/ADMIN) — zakládání, editace a mazání účtů, zamknutí/odemknutí, povolení/zakázání a vynucení změny hesla. Role se načítají přes API (`GET /api/roles`); je zavedena role **ADMIN** s globálním přístupem. Při založení uživatele lze iniciální přihlašovací údaje zaslat e-mailem.
+- **Záhlaví** — vlevo se zobrazuje logo aktivní společnosti (pokud existuje), její název a až poté text „nCRM — moderní CRM nástroj“.
 - **Reporty** — stažení PDF reportů (přehled prodejů, výkon zástupce, objednávky zákazníka).
 - Patička s copyrightem a verzí aplikace na každé obrazovce.
 

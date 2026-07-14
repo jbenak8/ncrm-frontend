@@ -10,6 +10,7 @@ import {
   DialogTitle,
   Grid,
   IconButton,
+  LinearProgress,
   MenuItem,
   Paper,
   Snackbar,
@@ -18,6 +19,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Tooltip,
@@ -29,7 +31,23 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import dayjs from 'dayjs';
 import client from '../api/client';
+import SearchFilterBar from '../components/SearchFilterBar';
 import { formatDateTime, MEETING_STATUS_LABELS, STATUS_COLORS } from '../utils/format';
+
+// Fields of the generic meeting search API (filter=field:operator:value).
+const SEARCH_FIELDS = [
+  { name: 'subject', label: 'Předmět', type: 'text' },
+  { name: 'description', label: 'Popis', type: 'text' },
+  { name: 'customer.name', label: 'Zákazník', type: 'text' },
+  { name: 'plannedDate', label: 'Plánovaný termín', type: 'datetime' },
+  {
+    name: 'status',
+    label: 'Stav',
+    type: 'enum',
+    options: Object.entries(MEETING_STATUS_LABELS).map(([value, label]) => ({ value, label })),
+  },
+  { name: 'outcome', label: 'Výsledek', type: 'text' },
+];
 
 function MeetingFormDialog({ open, meeting, onClose, onSaved }) {
   const [customers, setCustomers] = useState([]);
@@ -235,6 +253,11 @@ function CompleteDialog({ open, meeting, onClose, onCompleted }) {
 
 export default function MeetingsPage() {
   const [meetings, setMeetings] = useState([]);
+  const [filters, setFilters] = useState([]);
+  const [page, setPage] = useState(0);
+  const [size, setSize] = useState(25);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [snack, setSnack] = useState('');
   const [formOpen, setFormOpen] = useState(false);
@@ -242,15 +265,21 @@ export default function MeetingsPage() {
   const [completing, setCompleting] = useState(null);
 
   const load = useCallback(() => {
+    setLoading(true);
+    const params = new URLSearchParams();
+    params.set('page', page);
+    params.set('size', size);
+    params.set('sort', 'plannedDate,desc');
+    filters.forEach((f) => params.append('filter', f));
     client
-      .get('/meetings')
-      .then((res) =>
-        setMeetings(
-          [...res.data].sort((a, b) => (b.plannedDate || '').localeCompare(a.plannedDate || ''))
-        )
-      )
-      .catch(() => setError('Nepodařilo se načíst schůzky.'));
-  }, []);
+      .get('/meetings/search', { params })
+      .then((res) => {
+        setMeetings(res.data.content || []);
+        setTotal(res.data.totalElements ?? 0);
+      })
+      .catch(() => setError('Nepodařilo se načíst schůzky.'))
+      .finally(() => setLoading(false));
+  }, [page, size, filters]);
 
   useEffect(load, [load]);
 
@@ -289,7 +318,17 @@ export default function MeetingsPage() {
         </Alert>
       )}
 
+      <SearchFilterBar
+        fields={SEARCH_FIELDS}
+        filters={filters}
+        onChange={(next) => {
+          setFilters(next);
+          setPage(0);
+        }}
+      />
+
       <TableContainer component={Paper}>
+        {loading && <LinearProgress />}
         <Table size="small">
           <TableHead>
             <TableRow>
@@ -346,7 +385,7 @@ export default function MeetingsPage() {
                 </TableCell>
               </TableRow>
             ))}
-            {meetings.length === 0 && (
+            {meetings.length === 0 && !loading && (
               <TableRow>
                 <TableCell colSpan={7} align="center">
                   <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
@@ -357,6 +396,19 @@ export default function MeetingsPage() {
             )}
           </TableBody>
         </Table>
+        <TablePagination
+          component="div"
+          count={total}
+          page={page}
+          onPageChange={(_, p) => setPage(p)}
+          rowsPerPage={size}
+          onRowsPerPageChange={(e) => {
+            setSize(parseInt(e.target.value, 10));
+            setPage(0);
+          }}
+          rowsPerPageOptions={[10, 25, 50]}
+          labelRowsPerPage="Řádků na stránku:"
+        />
       </TableContainer>
 
       <MeetingFormDialog

@@ -10,6 +10,7 @@ import {
   DialogTitle,
   Grid,
   IconButton,
+  LinearProgress,
   MenuItem,
   Paper,
   Snackbar,
@@ -46,6 +47,7 @@ const emptyForm = {
 export default function SalesRepresentativesPage() {
   const [reps, setReps] = useState([]);
   const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [snack, setSnack] = useState('');
   const [formOpen, setFormOpen] = useState(false);
@@ -55,10 +57,12 @@ export default function SalesRepresentativesPage() {
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(() => {
+    setLoading(true);
     client
       .get('/sales-representatives')
       .then((res) => setReps(res.data))
-      .catch(() => setError('Nepodařilo se načíst obchodní zástupce.'));
+      .catch(() => setError('Nepodařilo se načíst obchodní zástupce.'))
+      .finally(() => setLoading(false));
     client
       .get('/users')
       .then((res) => setUsers(res.data))
@@ -139,6 +143,7 @@ export default function SalesRepresentativesPage() {
       )}
 
       <TableContainer component={Paper}>
+        {loading && <LinearProgress />}
         <Table size="small">
           <TableHead>
             <TableRow>

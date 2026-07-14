@@ -10,6 +10,7 @@ import {
   DialogTitle,
   Grid,
   IconButton,
+  LinearProgress,
   MenuItem,
   Paper,
   Snackbar,
@@ -52,6 +53,7 @@ const emptyForm = {
 export default function VatRatesPage() {
   const [rates, setRates] = useState([]);
   const [countries, setCountries] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [snack, setSnack] = useState('');
   const [formOpen, setFormOpen] = useState(false);
@@ -62,10 +64,12 @@ export default function VatRatesPage() {
   const [deleting, setDeleting] = useState(null);
 
   const load = useCallback(() => {
+    setLoading(true);
     client
       .get('/vat-rates')
       .then((res) => setRates(res.data))
-      .catch(() => setError('Nepodařilo se načíst sazby DPH.'));
+      .catch(() => setError('Nepodařilo se načíst sazby DPH.'))
+      .finally(() => setLoading(false));
     client
       .get('/countries')
       .then((res) => setCountries(res.data))
@@ -153,6 +157,7 @@ export default function VatRatesPage() {
       )}
 
       <TableContainer component={Paper}>
+        {loading && <LinearProgress />}
         <Table size="small">
           <TableHead>
             <TableRow>

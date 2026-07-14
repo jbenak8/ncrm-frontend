@@ -28,8 +28,14 @@ export default function LoginPage() {
     try {
       await loginBasic(username.trim(), password);
     } catch (err) {
-      if (err.response && err.response.status === 401) {
+      if (err.accountFlag === 'disabled') {
+        setError('Váš účet je zakázán. Kontaktujte prosím administrátora.');
+      } else if (err.accountFlag === 'locked') {
+        setError('Váš účet je zamknut. Kontaktujte prosím administrátora.');
+      } else if (err.response && err.response.status === 401) {
         setError('Neplatné uživatelské jméno nebo heslo.');
+      } else if (err.response && err.response.status === 403) {
+        setError('Přihlášení bylo odmítnuto. Účet může být zakázán nebo zamknut.');
       } else {
         setError('Přihlášení se nezdařilo. Zkontrolujte, zda běží backend.');
       }

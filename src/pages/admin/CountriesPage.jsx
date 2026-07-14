@@ -11,6 +11,7 @@ import {
   FormControlLabel,
   Grid,
   IconButton,
+  LinearProgress,
   Paper,
   Snackbar,
   Switch,
@@ -47,6 +48,7 @@ const emptyForm = {
  */
 export default function CountriesPage() {
   const [countries, setCountries] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [snack, setSnack] = useState('');
   const [formOpen, setFormOpen] = useState(false);
@@ -56,10 +58,12 @@ export default function CountriesPage() {
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(() => {
+    setLoading(true);
     client
       .get('/countries')
       .then((res) => setCountries(res.data))
-      .catch(() => setError('Nepodařilo se načíst země.'));
+      .catch(() => setError('Nepodařilo se načíst země.'))
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(load, [load]);
@@ -126,6 +130,7 @@ export default function CountriesPage() {
       )}
 
       <TableContainer component={Paper}>
+        {loading && <LinearProgress />}
         <Table size="small">
           <TableHead>
             <TableRow>

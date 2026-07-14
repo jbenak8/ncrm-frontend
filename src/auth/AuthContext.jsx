@@ -101,6 +101,24 @@ export function AuthProvider({ children }) {
       setAuthHeader(header);
       try {
         const me = await loadCurrentUser(username);
+        // Check the account state flags of the logged-in user (when the account
+        // exists in the DB) and refuse disabled or locked accounts client-side
+        // as well; mustChangePassword / credentialsExpired are handled by the
+        // forced password-change dialog in App.
+        if (me && me.enabled === false) {
+          setAuthHeader(null);
+          setUser(null);
+          const err = new Error('Account is disabled');
+          err.accountFlag = 'disabled';
+          throw err;
+        }
+        if (me && me.locked === true) {
+          setAuthHeader(null);
+          setUser(null);
+          const err = new Error('Account is locked');
+          err.accountFlag = 'locked';
+          throw err;
+        }
         sessionStorage.setItem('ncrm-basic-auth', header);
         sessionStorage.setItem('ncrm-basic-user', username);
         return me;
@@ -116,22 +134,34 @@ export function AuthProvider({ children }) {
     getKeycloak().login({ redirectUri: window.location.origin });
   }, []);
 
+  // Re-reads the profile of the logged-in user (e.g. after a password change).
+  const refreshUser = useCallback(
+    () => loadCurrentUser(sessionStorage.getItem('ncrm-basic-user') || undefined),
+    [loadCurrentUser]
+  );
+
   const value = useMemo(() => {
     const roles = user?.roles || [];
     const normalized = roles.map((r) => r.replace(/^ROLE_/, '').toUpperCase());
+    const isAdmin = normalized.includes('ADMIN');
     return {
       authMode: AUTH_MODE,
       initializing,
       user,
       isAuthenticated: !!user,
-      isOwner: normalized.includes('OWNER'),
+      // The administrator role has global access, i.e. everything the owner can do.
+      isAdmin,
+      isOwner: isAdmin || normalized.includes('OWNER'),
       isSalesRep: normalized.includes('SALES_REPRESENTATIVE'),
+      // The user has to change their password before continuing.
+      mustChangePassword: !!user && (user.mustChangePassword === true || user.credentialsExpired === true),
       roles: normalized,
       loginBasic,
       loginKeycloak,
+      refreshUser,
       logout,
     };
-  }, [user, initializing, loginBasic, loginKeycloak, logout]);
+  }, [user, initializing, loginBasic, loginKeycloak, refreshUser, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

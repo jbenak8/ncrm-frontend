@@ -11,6 +11,7 @@ import {
   DialogTitle,
   Grid,
   IconButton,
+  LinearProgress,
   MenuItem,
   Paper,
   Snackbar,
@@ -19,6 +20,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Typography,
@@ -29,7 +31,24 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import dayjs from 'dayjs';
 import client from '../api/client';
+import SearchFilterBar from '../components/SearchFilterBar';
 import { formatDateTime, formatMoney, ORDER_STATUS_LABELS, STATUS_COLORS } from '../utils/format';
+
+// Fields of the generic order search API (filter=field:operator:value).
+const SEARCH_FIELDS = [
+  { name: 'orderNumber', label: 'Číslo objednávky', type: 'text' },
+  { name: 'customer.name', label: 'Zákazník', type: 'text' },
+  { name: 'orderDate', label: 'Datum', type: 'date' },
+  { name: 'totalPrice', label: 'Cena', type: 'number' },
+  { name: 'currency', label: 'Měna', type: 'text' },
+  {
+    name: 'status',
+    label: 'Stav',
+    type: 'enum',
+    options: Object.entries(ORDER_STATUS_LABELS).map(([value, label]) => ({ value, label })),
+  },
+  { name: 'note', label: 'Poznámka', type: 'text' },
+];
 
 const NEXT_STATUSES = {
   NEW: ['CONFIRMED', 'CANCELLED'],
@@ -334,16 +353,31 @@ function NewOrderDialog({ open, onClose, onSaved }) {
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState([]);
+  const [filters, setFilters] = useState([]);
+  const [page, setPage] = useState(0);
+  const [size, setSize] = useState(25);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [snack, setSnack] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const load = useCallback(() => {
+    setLoading(true);
+    const params = new URLSearchParams();
+    params.set('page', page);
+    params.set('size', size);
+    params.set('sort', 'orderDate,desc');
+    filters.forEach((f) => params.append('filter', f));
     client
-      .get('/orders')
-      .then((res) => setOrders(res.data))
-      .catch(() => setError('Nepodařilo se načíst objednávky.'));
-  }, []);
+      .get('/orders/search', { params })
+      .then((res) => {
+        setOrders(res.data.content || []);
+        setTotal(res.data.totalElements ?? 0);
+      })
+      .catch(() => setError('Nepodařilo se načíst objednávky.'))
+      .finally(() => setLoading(false));
+  }, [page, size, filters]);
 
   useEffect(load, [load]);
 
@@ -374,7 +408,17 @@ export default function OrdersPage() {
         </Alert>
       )}
 
+      <SearchFilterBar
+        fields={SEARCH_FIELDS}
+        filters={filters}
+        onChange={(next) => {
+          setFilters(next);
+          setPage(0);
+        }}
+      />
+
       <TableContainer component={Paper}>
+        {loading && <LinearProgress />}
         <Table size="small">
           <TableHead>
             <TableRow>
@@ -392,7 +436,7 @@ export default function OrdersPage() {
             {orders.map((o) => (
               <OrderRow key={o.id} order={o} onStatusChange={handleStatusChange} />
             ))}
-            {orders.length === 0 && (
+            {orders.length === 0 && !loading && (
               <TableRow>
                 <TableCell colSpan={8} align="center">
                   <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
@@ -403,6 +447,19 @@ export default function OrdersPage() {
             )}
           </TableBody>
         </Table>
+        <TablePagination
+          component="div"
+          count={total}
+          page={page}
+          onPageChange={(_, p) => setPage(p)}
+          rowsPerPage={size}
+          onRowsPerPageChange={(e) => {
+            setSize(parseInt(e.target.value, 10));
+            setPage(0);
+          }}
+          rowsPerPageOptions={[10, 25, 50]}
+          labelRowsPerPage="Řádků na stránku:"
+        />
       </TableContainer>
 
       <NewOrderDialog

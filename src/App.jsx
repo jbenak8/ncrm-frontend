@@ -4,7 +4,9 @@ import { useAuth } from './auth/AuthContext';
 import { CompanyProvider } from './company/CompanyContext';
 import Layout from './components/Layout';
 import CompanySelectDialog from './components/CompanySelectDialog';
+import ChangePasswordDialog from './components/ChangePasswordDialog';
 import LoginPage from './pages/LoginPage';
+import AiChatPage from './pages/AiChatPage';
 import DashboardPage from './pages/DashboardPage';
 import CustomersPage from './pages/CustomersPage';
 import CustomerDetailPage from './pages/CustomerDetailPage';
@@ -28,7 +30,7 @@ function FullScreenLoader() {
 }
 
 export default function App() {
-  const { initializing, isAuthenticated, isOwner } = useAuth();
+  const { initializing, isAuthenticated, isOwner, mustChangePassword, refreshUser } = useAuth();
 
   if (initializing) {
     return <FullScreenLoader />;
@@ -42,6 +44,16 @@ export default function App() {
     );
   }
 
+  // The user has to change their password before being allowed to work with the app.
+  if (mustChangePassword) {
+    return (
+      <>
+        <FullScreenLoader />
+        <ChangePasswordDialog open forced onChanged={refreshUser} />
+      </>
+    );
+  }
+
   return (
     <CompanyProvider>
       <Layout>
@@ -52,6 +64,7 @@ export default function App() {
           <Route path="/orders" element={<OrdersPage />} />
           <Route path="/meetings" element={<MeetingsPage />} />
           <Route path="/items" element={<ItemsPage />} />
+          <Route path="/ai-chat" element={<AiChatPage />} />
           {isOwner && <Route path="/campaigns" element={<CampaignsPage />} />}
           {isOwner && <Route path="/users" element={<UsersPage />} />}
           {isOwner && <Route path="/admin/companies" element={<CompaniesPage />} />}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 import {
   AppBar,
@@ -32,12 +32,57 @@ import CampaignIcon from '@mui/icons-material/Campaign';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import AssessmentIcon from '@mui/icons-material/Assessment';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
 import LogoutIcon from '@mui/icons-material/Logout';
+import client from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useCompany } from '../company/CompanyContext';
 import Footer from './Footer';
 
 const DRAWER_WIDTH = 240;
+
+/**
+ * Logo of the active company shown in the application bar. The image is
+ * fetched through the authenticated API client; when the company has no
+ * logo, nothing is rendered.
+ */
+function CompanyLogo({ companyId }) {
+  const [url, setUrl] = useState(null);
+
+  useEffect(() => {
+    if (!companyId) {
+      setUrl(null);
+      return undefined;
+    }
+    let objectUrl = null;
+    let cancelled = false;
+    client
+      .get(`/companies/${companyId}/logo`, { responseType: 'blob' })
+      .then((res) => {
+        if (!cancelled && res.data && res.data.size > 0) {
+          objectUrl = URL.createObjectURL(res.data);
+          setUrl(objectUrl);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setUrl(null);
+      });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [companyId]);
+
+  if (!url) return null;
+  return (
+    <Box
+      component="img"
+      src={url}
+      alt="Logo společnosti"
+      sx={{ height: 36, maxWidth: 120, objectFit: 'contain', mr: 1.5, bgcolor: 'white', borderRadius: 0.5, p: 0.25 }}
+    />
+  );
+}
 
 export default function Layout({ children }) {
   const { user, isOwner, logout } = useAuth();
@@ -89,6 +134,7 @@ export default function Layout({ children }) {
     { to: '/meetings', label: 'Schůzky', icon: <EventIcon /> },
     { to: '/items', label: 'Položky', icon: <Inventory2Icon /> },
     ...(isOwner ? [{ to: '/campaigns', label: 'Kampaně', icon: <CampaignIcon /> }] : []),
+    { to: '/ai-chat', label: 'AI chat', icon: <SmartToyIcon /> },
     { to: '/reports', label: 'Reporty', icon: <AssessmentIcon /> },
   ];
 
@@ -180,14 +226,21 @@ export default function Layout({ children }) {
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            nCRM — moderní CRM nástroj
-          </Typography>
-          {showCompanySwitcher && (
-            <Typography variant="body2" sx={{ mr: 2, display: { xs: 'none', sm: 'block' } }}>
-              {activeCompany?.name || 'Společnost nevybrána'}
+          {activeCompany && <CompanyLogo companyId={activeCompany.id} />}
+          {activeCompany && (
+            <Typography variant="h6" sx={{ mr: 2, whiteSpace: 'nowrap' }}>
+              {activeCompany.name}
             </Typography>
           )}
+          <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+            <Typography
+              variant="subtitle1"
+              noWrap
+              sx={{ opacity: 0.85, display: { xs: 'none', sm: 'block' } }}
+            >
+              nCRM — moderní CRM nástroj
+            </Typography>
+          </Box>
           <Typography variant="body2" sx={{ mr: 1, display: { xs: 'none', sm: 'block' } }}>
             {displayName}
           </Typography>

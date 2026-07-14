@@ -9,6 +9,7 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
+  LinearProgress,
   Paper,
   Snackbar,
   Table,
@@ -36,6 +37,7 @@ import { useCompany } from '../../company/CompanyContext';
 export default function CompaniesPage() {
   const { reload: reloadCompanyContext } = useCompany();
   const [companies, setCompanies] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [snack, setSnack] = useState('');
   const [formOpen, setFormOpen] = useState(false);
@@ -43,10 +45,12 @@ export default function CompaniesPage() {
   const [deleting, setDeleting] = useState(null);
 
   const load = useCallback(() => {
+    setLoading(true);
     client
       .get('/companies')
       .then((res) => setCompanies(res.data))
-      .catch(() => setError('Nepodařilo se načíst společnosti.'));
+      .catch(() => setError('Nepodařilo se načíst společnosti.'))
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(load, [load]);
@@ -104,13 +108,14 @@ export default function CompaniesPage() {
         </Alert>
       )}
 
-      {companies.length === 0 && (
+      {companies.length === 0 && !loading && (
         <Alert severity="warning" sx={{ mb: 2 }}>
           Zatím není založena žádná společnost. Pro práci s aplikací je třeba společnost založit.
         </Alert>
       )}
 
       <TableContainer component={Paper}>
+        {loading && <LinearProgress />}
         <Table size="small">
           <TableHead>
             <TableRow>

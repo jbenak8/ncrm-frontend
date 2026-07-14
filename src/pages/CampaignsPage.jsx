@@ -14,6 +14,7 @@ import {
   FormControlLabel,
   Grid,
   IconButton,
+  LinearProgress,
   ListItemText,
   MenuItem,
   Paper,
@@ -23,6 +24,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Tooltip,
@@ -35,7 +37,23 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import client from '../api/client';
+import SearchFilterBar from '../components/SearchFilterBar';
 import { CAMPAIGN_STATUS_LABELS, formatDateTime, STATUS_COLORS } from '../utils/format';
+
+// Fields of the generic campaign search API (filter=field:operator:value).
+const SEARCH_FIELDS = [
+  { name: 'name', label: 'Název', type: 'text' },
+  { name: 'subject', label: 'Předmět', type: 'text' },
+  {
+    name: 'status',
+    label: 'Stav',
+    type: 'enum',
+    options: Object.entries(CAMPAIGN_STATUS_LABELS).map(([value, label]) => ({ value, label })),
+  },
+  { name: 'scheduledAt', label: 'Naplánováno', type: 'datetime' },
+  { name: 'sentAt', label: 'Odesláno', type: 'datetime' },
+  { name: 'createdBy.username', label: 'Vytvořil', type: 'text' },
+];
 
 function CampaignRow({ campaign, onSend, onCancel }) {
   const [open, setOpen] = useState(false);
@@ -360,16 +378,31 @@ function NewCampaignDialog({ open, onClose, onSaved }) {
 
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState([]);
+  const [filters, setFilters] = useState([]);
+  const [page, setPage] = useState(0);
+  const [size, setSize] = useState(25);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [snack, setSnack] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const load = useCallback(() => {
+    setLoading(true);
+    const params = new URLSearchParams();
+    params.set('page', page);
+    params.set('size', size);
+    params.set('sort', 'name,asc');
+    filters.forEach((f) => params.append('filter', f));
     client
-      .get('/campaigns')
-      .then((res) => setCampaigns(res.data))
-      .catch(() => setError('Nepodařilo se načíst kampaně.'));
-  }, []);
+      .get('/campaigns/search', { params })
+      .then((res) => {
+        setCampaigns(res.data.content || []);
+        setTotal(res.data.totalElements ?? 0);
+      })
+      .catch(() => setError('Nepodařilo se načíst kampaně.'))
+      .finally(() => setLoading(false));
+  }, [page, size, filters]);
 
   useEffect(load, [load]);
 
@@ -412,7 +445,17 @@ export default function CampaignsPage() {
         </Alert>
       )}
 
+      <SearchFilterBar
+        fields={SEARCH_FIELDS}
+        filters={filters}
+        onChange={(next) => {
+          setFilters(next);
+          setPage(0);
+        }}
+      />
+
       <TableContainer component={Paper}>
+        {loading && <LinearProgress />}
         <Table size="small">
           <TableHead>
             <TableRow>
@@ -430,7 +473,7 @@ export default function CampaignsPage() {
             {campaigns.map((c) => (
               <CampaignRow key={c.id} campaign={c} onSend={handleSend} onCancel={handleCancel} />
             ))}
-            {campaigns.length === 0 && (
+            {campaigns.length === 0 && !loading && (
               <TableRow>
                 <TableCell colSpan={8} align="center">
                   <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
@@ -441,6 +484,19 @@ export default function CampaignsPage() {
             )}
           </TableBody>
         </Table>
+        <TablePagination
+          component="div"
+          count={total}
+          page={page}
+          onPageChange={(_, p) => setPage(p)}
+          rowsPerPage={size}
+          onRowsPerPageChange={(e) => {
+            setSize(parseInt(e.target.value, 10));
+            setPage(0);
+          }}
+          rowsPerPageOptions={[10, 25, 50]}
+          labelRowsPerPage="Řádků na stránku:"
+        />
       </TableContainer>
 
       <NewCampaignDialog

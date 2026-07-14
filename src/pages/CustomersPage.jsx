@@ -6,7 +6,7 @@ import {
   Button,
   Chip,
   IconButton,
-  InputAdornment,
+  LinearProgress,
   Paper,
   Snackbar,
   Table,
@@ -16,17 +16,28 @@ import {
   TableHead,
   TablePagination,
   TableRow,
-  TextField,
   Tooltip,
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
-import SearchIcon from '@mui/icons-material/Search';
 import BlockIcon from '@mui/icons-material/Block';
 import client from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import CustomerFormDialog from '../components/CustomerFormDialog';
+import SearchFilterBar from '../components/SearchFilterBar';
+
+// Fields of the generic customer search API (filter=field:operator:value).
+const SEARCH_FIELDS = [
+  { name: 'name', label: 'Název', type: 'text' },
+  { name: 'registrationId', label: 'IČO', type: 'text' },
+  { name: 'vatId', label: 'DIČ', type: 'text' },
+  { name: 'email', label: 'E-mail', type: 'text' },
+  { name: 'phone', label: 'Telefon', type: 'text' },
+  { name: 'headquartersAddress.city', label: 'Město', type: 'text' },
+  { name: 'headquartersAddress.zipCode', label: 'PSČ', type: 'text' },
+  { name: 'active', label: 'Aktivní', type: 'boolean' },
+];
 
 export default function CustomersPage() {
   const navigate = useNavigate();
@@ -35,28 +46,31 @@ export default function CustomersPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(10);
-  const [search, setSearch] = useState('');
+  const [filters, setFilters] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [snack, setSnack] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
 
   const load = useCallback(() => {
-    const params = { page, size, sort: 'name,asc' };
-    if (search.trim()) params.name = search.trim();
+    setLoading(true);
+    const params = new URLSearchParams();
+    params.set('page', page);
+    params.set('size', size);
+    params.set('sort', 'name,asc');
+    filters.forEach((f) => params.append('filter', f));
     client
-      .get('/customers', { params })
+      .get('/customers/search', { params })
       .then((res) => {
         setRows(res.data.content || []);
         setTotal(res.data.totalElements ?? 0);
       })
-      .catch(() => setError('Nepodařilo se načíst zákazníky.'));
-  }, [page, size, search]);
+      .catch(() => setError('Nepodařilo se načíst zákazníky.'))
+      .finally(() => setLoading(false));
+  }, [page, size, filters]);
 
-  useEffect(() => {
-    const t = setTimeout(load, 300);
-    return () => clearTimeout(t);
-  }, [load]);
+  useEffect(load, [load]);
 
   const handleDeactivate = async (customer) => {
     if (!window.confirm(`Opravdu deaktivovat zákazníka „${customer.name}“?`)) return;
@@ -93,27 +107,17 @@ export default function CustomersPage() {
         </Alert>
       )}
 
-      <Paper sx={{ p: 2, mb: 2 }}>
-        <TextField
-          size="small"
-          placeholder="Hledat podle názvu…"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(0);
-          }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" />
-              </InputAdornment>
-            ),
-          }}
-          sx={{ width: 320 }}
-        />
-      </Paper>
+      <SearchFilterBar
+        fields={SEARCH_FIELDS}
+        filters={filters}
+        onChange={(next) => {
+          setFilters(next);
+          setPage(0);
+        }}
+      />
 
       <TableContainer component={Paper}>
+        {loading && <LinearProgress />}
         <Table size="small">
           <TableHead>
             <TableRow>
@@ -168,7 +172,7 @@ export default function CustomersPage() {
                 </TableCell>
               </TableRow>
             ))}
-            {rows.length === 0 && (
+            {rows.length === 0 && !loading && (
               <TableRow>
                 <TableCell colSpan={7} align="center">
                   <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
