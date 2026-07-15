@@ -29,6 +29,19 @@ import EditIcon from '@mui/icons-material/Edit';
 import ToggleOnIcon from '@mui/icons-material/ToggleOn';
 import ToggleOffIcon from '@mui/icons-material/ToggleOff';
 import client from '../../api/client';
+import SearchFilterBar from '../../components/SearchFilterBar';
+import { applyClientFilters } from '../../utils/clientFilter';
+
+// Fields offered by the search bar (filtering is done on the client).
+const SEARCH_FIELDS = [
+  { name: 'code', label: 'Kód', type: 'text' },
+  { name: 'firstName', label: 'Jméno', type: 'text' },
+  { name: 'lastName', label: 'Příjmení', type: 'text' },
+  { name: 'businessEmail', label: 'E-mail', type: 'text' },
+  { name: 'phone', label: 'Telefon', type: 'text' },
+  { name: 'region', label: 'Region', type: 'text' },
+  { name: 'active', label: 'Aktivní', type: 'boolean' },
+];
 
 const emptyForm = {
   code: '',
@@ -55,6 +68,7 @@ export default function SalesRepresentativesPage() {
   const [form, setForm] = useState(emptyForm);
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [filters, setFilters] = useState([]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -125,6 +139,8 @@ export default function SalesRepresentativesPage() {
     }
   };
 
+  const visibleReps = applyClientFilters(reps, filters);
+
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -142,6 +158,8 @@ export default function SalesRepresentativesPage() {
         </Alert>
       )}
 
+      <SearchFilterBar fields={SEARCH_FIELDS} filters={filters} onChange={setFilters} />
+
       <TableContainer component={Paper}>
         {loading && <LinearProgress />}
         <Table size="small">
@@ -157,7 +175,7 @@ export default function SalesRepresentativesPage() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {reps.map((r) => (
+            {visibleReps.map((r) => (
               <TableRow key={r.id} hover>
                 <TableCell>{r.code || '—'}</TableCell>
                 <TableCell>
@@ -191,7 +209,7 @@ export default function SalesRepresentativesPage() {
                 </TableCell>
               </TableRow>
             ))}
-            {reps.length === 0 && (
+            {visibleReps.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7} align="center">
                   <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>

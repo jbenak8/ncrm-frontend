@@ -13,6 +13,7 @@ import {
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { useAuth } from '../auth/AuthContext';
 import Footer from '../components/Footer';
+import appLogo from '../assets/nCRM_logo2.png';
 
 export default function LoginPage() {
   const { authMode, loginBasic, loginKeycloak } = useAuth();
@@ -51,8 +52,28 @@ export default function LoginPage() {
         display: 'flex',
         flexDirection: 'column',
         bgcolor: 'background.default',
+        position: 'relative',
+        overflow: 'hidden',
       }}
     >
+      {/* Semi-transparent application logo in the background of the login screen. */}
+      <Box
+        component="img"
+        src={appLogo}
+        alt=""
+        aria-hidden
+        sx={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: { xs: '90%', md: '60%' },
+          maxWidth: 900,
+          opacity: 0.06,
+          pointerEvents: 'none',
+          userSelect: 'none',
+        }}
+      />
       <Box
         sx={{
           flexGrow: 1,
@@ -62,7 +83,7 @@ export default function LoginPage() {
           p: 2,
         }}
       >
-        <Card sx={{ maxWidth: 420, width: '100%' }}>
+        <Card sx={{ maxWidth: 420, width: '100%', position: 'relative' }}>
           <CardContent sx={{ p: 4 }}>
             <Stack spacing={2} alignItems="center">
               <Box
@@ -76,9 +97,7 @@ export default function LoginPage() {
               >
                 <LockOutlinedIcon />
               </Box>
-              <Typography variant="h5" fontWeight={700}>
-                nCRM
-              </Typography>
+              <Box component="img" src={appLogo} alt="nCRM" sx={{ height: 56, objectFit: 'contain' }} />
               <Typography variant="body2" color="text.secondary" textAlign="center">
                 Přihlaste se ke svému CRM účtu
               </Typography>

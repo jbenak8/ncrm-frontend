@@ -34,6 +34,18 @@ import {
   STATUS_COLORS,
 } from '../utils/format';
 
+const CAMPAIGN_STATUS_LABELS = {
+  DRAFT: 'Koncept',
+  SCHEDULED: 'Naplánovaná',
+  SENDING: 'Odesílá se',
+};
+
+const CAMPAIGN_STATUS_COLORS = {
+  DRAFT: 'default',
+  SCHEDULED: 'info',
+  SENDING: 'warning',
+};
+
 function StatCard({ title, value, subtitle }) {
   return (
     <Card sx={{ height: '100%' }}>
@@ -147,6 +159,50 @@ function OwnerDashboard() {
                 ))}
               </TableBody>
             </Table>
+          </CardContent>
+        </Card>
+      </Grid>
+
+      <Grid item xs={12}>
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Aktivní kampaně
+            </Typography>
+            {(data.activeCampaigns || []).length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                Žádné aktivní kampaně.
+              </Typography>
+            ) : (
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Název</TableCell>
+                    <TableCell>Předmět</TableCell>
+                    <TableCell>Stav</TableCell>
+                    <TableCell>Naplánováno na</TableCell>
+                    <TableCell align="right">Příjemců</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {(data.activeCampaigns || []).map((c) => (
+                    <TableRow key={c.id}>
+                      <TableCell>{c.name}</TableCell>
+                      <TableCell>{c.subject}</TableCell>
+                      <TableCell>
+                        <Chip
+                          size="small"
+                          label={CAMPAIGN_STATUS_LABELS[c.status] || c.status}
+                          color={CAMPAIGN_STATUS_COLORS[c.status] || 'default'}
+                        />
+                      </TableCell>
+                      <TableCell>{c.scheduledAt ? formatDateTime(c.scheduledAt) : '—'}</TableCell>
+                      <TableCell align="right">{c.recipientCount}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </Grid>

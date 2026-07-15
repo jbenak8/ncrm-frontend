@@ -23,6 +23,7 @@ import client from '../api/client';
 const emptyAddress = {
   street: '',
   houseNumber: '',
+  streetNumber: '',
   city: '',
   zipCode: '',
   countryIsoCode: 'CZ',
@@ -221,7 +222,7 @@ export default function CustomerFormDialog({ open, customer, onClose, onSaved })
               </Typography>
             </Divider>
           </Grid>
-          <Grid item xs={12} sm={8}>
+          <Grid item xs={12} sm={6}>
             <TextField
               label="Ulice"
               value={form.headquartersAddress.street}
@@ -229,11 +230,19 @@ export default function CustomerFormDialog({ open, customer, onClose, onSaved })
               fullWidth
             />
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid item xs={12} sm={3}>
             <TextField
               label="Číslo popisné"
               value={form.headquartersAddress.houseNumber}
               onChange={setAddr('houseNumber')}
+              fullWidth
+            />
+          </Grid>
+          <Grid item xs={12} sm={3}>
+            <TextField
+              label="Číslo orientační"
+              value={form.headquartersAddress.streetNumber}
+              onChange={setAddr('streetNumber')}
               fullWidth
             />
           </Grid>

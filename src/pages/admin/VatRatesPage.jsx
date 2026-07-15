@@ -29,7 +29,9 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import dayjs from 'dayjs';
 import client from '../../api/client';
+import SearchFilterBar from '../../components/SearchFilterBar';
 import { formatDate } from '../../utils/format';
+import { applyClientFilters } from '../../utils/clientFilter';
 
 const VAT_TYPE_LABELS = {
   BASE: 'Základní',
@@ -38,6 +40,21 @@ const VAT_TYPE_LABELS = {
   REDUCED_3: 'Snížená 3',
   ZERO: 'Nulová',
 };
+
+// Fields offered by the search bar (filtering is done on the client).
+const SEARCH_FIELDS = [
+  { name: 'countryName', label: 'Země', type: 'text' },
+  { name: 'countryIsoCode', label: 'ISO kód země', type: 'text' },
+  {
+    name: 'type',
+    label: 'Typ',
+    type: 'enum',
+    options: Object.entries(VAT_TYPE_LABELS).map(([value, label]) => ({ value, label })),
+  },
+  { name: 'rate', label: 'Sazba (%)', type: 'number' },
+  { name: 'validFrom', label: 'Platnost od', type: 'date' },
+  { name: 'validTo', label: 'Platnost do', type: 'date' },
+];
 
 const emptyForm = {
   countryIsoCode: 'CZ',
@@ -62,6 +79,7 @@ export default function VatRatesPage() {
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(null);
+  const [filters, setFilters] = useState([]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -139,6 +157,8 @@ export default function VatRatesPage() {
     }
   };
 
+  const visibleRates = applyClientFilters(rates, filters);
+
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -156,6 +176,8 @@ export default function VatRatesPage() {
         </Alert>
       )}
 
+      <SearchFilterBar fields={SEARCH_FIELDS} filters={filters} onChange={setFilters} />
+
       <TableContainer component={Paper}>
         {loading && <LinearProgress />}
         <Table size="small">
@@ -170,7 +192,7 @@ export default function VatRatesPage() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {rates.map((r) => (
+            {visibleRates.map((r) => (
               <TableRow key={r.id} hover>
                 <TableCell>
                   {r.countryName || r.countryIsoCode}{' '}
@@ -194,7 +216,7 @@ export default function VatRatesPage() {
                 </TableCell>
               </TableRow>
             ))}
-            {rates.length === 0 && (
+            {visibleRates.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6} align="center">
                   <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>

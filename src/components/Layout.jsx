@@ -38,6 +38,7 @@ import client from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useCompany } from '../company/CompanyContext';
 import Footer from './Footer';
+import appLogo from '../assets/nCRM_logo2.png';
 
 const DRAWER_WIDTH = 240;
 
@@ -154,9 +155,7 @@ export default function Layout({ children }) {
   const drawerContent = (
     <Box>
       <Toolbar>
-        <Typography variant="h6" color="primary" fontWeight={700}>
-          nCRM
-        </Typography>
+        <Box component="img" src={appLogo} alt="nCRM" sx={{ height: 40, objectFit: 'contain' }} />
       </Toolbar>
       <Divider />
       <List>
@@ -232,13 +231,35 @@ export default function Layout({ children }) {
               {activeCompany.name}
             </Typography>
           )}
-          <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+          <Box
+            sx={{
+              flexGrow: 1,
+              minWidth: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 1.5,
+            }}
+          >
+            <Box
+              component="img"
+              src={appLogo}
+              alt="nCRM"
+              sx={{
+                height: 36,
+                objectFit: 'contain',
+                bgcolor: 'white',
+                borderRadius: 0.5,
+                p: 0.25,
+                display: { xs: 'none', sm: 'block' },
+              }}
+            />
             <Typography
               variant="subtitle1"
               noWrap
               sx={{ opacity: 0.85, display: { xs: 'none', sm: 'block' } }}
             >
-              nCRM — moderní CRM nástroj
+              moderní CRM nástroj
             </Typography>
           </Box>
           <Typography variant="body2" sx={{ mr: 1, display: { xs: 'none', sm: 'block' } }}>

@@ -30,6 +30,20 @@ import EditIcon from '@mui/icons-material/Edit';
 import ToggleOnIcon from '@mui/icons-material/ToggleOn';
 import ToggleOffIcon from '@mui/icons-material/ToggleOff';
 import client from '../../api/client';
+import SearchFilterBar from '../../components/SearchFilterBar';
+import { applyClientFilters } from '../../utils/clientFilter';
+
+// Fields offered by the search bar (filtering is done on the client).
+const SEARCH_FIELDS = [
+  { name: 'isoCode', label: 'ISO kód', type: 'text' },
+  { name: 'name', label: 'Název', type: 'text' },
+  { name: 'nameEn', label: 'Název (EN)', type: 'text' },
+  { name: 'dialingCode', label: 'Předvolba', type: 'text' },
+  { name: 'vatShortCode', label: 'DPH kód', type: 'text' },
+  { name: 'euMember', label: 'Člen EU', type: 'boolean' },
+  { name: 'embargoed', label: 'Embargo', type: 'boolean' },
+  { name: 'active', label: 'Aktivní', type: 'boolean' },
+];
 
 const emptyForm = {
   isoCode: '',
@@ -56,6 +70,7 @@ export default function CountriesPage() {
   const [form, setForm] = useState(emptyForm);
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [filters, setFilters] = useState([]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -112,6 +127,8 @@ export default function CountriesPage() {
     }
   };
 
+  const visibleCountries = applyClientFilters(countries, filters);
+
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -128,6 +145,8 @@ export default function CountriesPage() {
           {error}
         </Alert>
       )}
+
+      <SearchFilterBar fields={SEARCH_FIELDS} filters={filters} onChange={setFilters} />
 
       <TableContainer component={Paper}>
         {loading && <LinearProgress />}
@@ -146,7 +165,7 @@ export default function CountriesPage() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {countries.map((c) => (
+            {visibleCountries.map((c) => (
               <TableRow key={c.isoCode} hover>
                 <TableCell>{c.isoCode}</TableCell>
                 <TableCell>{c.name}</TableCell>
@@ -182,7 +201,7 @@ export default function CountriesPage() {
                 </TableCell>
               </TableRow>
             ))}
-            {countries.length === 0 && (
+            {visibleCountries.length === 0 && (
               <TableRow>
                 <TableCell colSpan={9} align="center">
                   <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>

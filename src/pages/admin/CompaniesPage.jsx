@@ -28,7 +28,19 @@ import StarIcon from '@mui/icons-material/Star';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import client from '../../api/client';
 import CompanyFormDialog from '../../components/CompanyFormDialog';
+import SearchFilterBar from '../../components/SearchFilterBar';
 import { useCompany } from '../../company/CompanyContext';
+import { applyClientFilters } from '../../utils/clientFilter';
+
+// Fields offered by the search bar (filtering is done on the client).
+const SEARCH_FIELDS = [
+  { name: 'name', label: 'Název', type: 'text' },
+  { name: 'registrationId', label: 'IČO', type: 'text' },
+  { name: 'vatId', label: 'DIČ', type: 'text' },
+  { name: 'email', label: 'E-mail', type: 'text' },
+  { name: 'address.city', label: 'Město', type: 'text' },
+  { name: 'active', label: 'Aktivní', type: 'boolean' },
+];
 
 /**
  * Administration of own companies (owner only): create, edit, soft delete
@@ -43,6 +55,7 @@ export default function CompaniesPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
+  const [filters, setFilters] = useState([]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -84,6 +97,8 @@ export default function CompaniesPage() {
   const formatAddress = (a) =>
     a ? [a.street, a.houseNumber, a.city].filter(Boolean).join(' ') || '—' : '—';
 
+  const visibleCompanies = applyClientFilters(companies, filters);
+
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -114,6 +129,8 @@ export default function CompaniesPage() {
         </Alert>
       )}
 
+      <SearchFilterBar fields={SEARCH_FIELDS} filters={filters} onChange={setFilters} />
+
       <TableContainer component={Paper}>
         {loading && <LinearProgress />}
         <Table size="small">
@@ -129,7 +146,7 @@ export default function CompaniesPage() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {companies.map((c) => (
+            {visibleCompanies.map((c) => (
               <TableRow key={c.id} hover>
                 <TableCell>
                   {c.name}
@@ -183,7 +200,7 @@ export default function CompaniesPage() {
                 </TableCell>
               </TableRow>
             ))}
-            {companies.length === 0 && (
+            {visibleCompanies.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7} align="center">
                   <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
