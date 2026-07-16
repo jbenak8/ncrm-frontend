@@ -30,11 +30,19 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import PrintIcon from '@mui/icons-material/Print';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import dayjs from 'dayjs';
 import client from '../api/client';
 import SearchFilterBar from '../components/SearchFilterBar';
-import { formatDateTime, formatMoney, ORDER_STATUS_LABELS, STATUS_COLORS } from '../utils/format';
+import {
+  formatDateTime,
+  formatMoney,
+  INVOICE_PAYMENT_LABELS,
+  ORDER_STATUS_LABELS,
+  STATUS_COLORS,
+} from '../utils/format';
 
 // Fields of the generic order search API (filter=field:operator:value).
 const SEARCH_FIELDS = [
@@ -63,7 +71,7 @@ const NEXT_STATUSES = {
   CANCELLED: [],
 };
 
-function OrderRow({ order, onStatusChange, onEditItems }) {
+function OrderRow({ order, onStatusChange, onEditItems, onPrint, onIssueInvoice }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -103,6 +111,18 @@ function OrderRow({ order, onStatusChange, onEditItems }) {
               </IconButton>
             </Tooltip>
           )}
+          {order.status === 'COMPLETED' && (
+            <Tooltip title="Vystavit fakturu">
+              <IconButton size="small" color="primary" onClick={() => onIssueInvoice(order)}>
+                <ReceiptLongIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+          <Tooltip title="Vytisknout objednávku">
+            <IconButton size="small" onClick={() => onPrint(order)}>
+              <PrintIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
         </TableCell>
       </TableRow>
       <TableRow>
@@ -259,6 +279,109 @@ function EditOrderItemsDialog({ order, onClose, onSaved }) {
         <Button onClick={onClose}>Zrušit</Button>
         <Button variant="contained" onClick={handleSave} disabled={saving}>
           {saving ? 'Ukládám…' : 'Uložit'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+/**
+ * Dialog for issuing an invoice for a completed order. The payment type determines
+ * the layout of the printed invoice (a bank transfer invoice carries the bank
+ * account, variable symbol and a payment QR code); the request is sent to
+ * `POST /invoices`.
+ */
+function IssueInvoiceDialog({ order, onClose, onIssued }) {
+  const [form, setForm] = useState({ paymentType: 'TRANSFER', dueDays: 14, note: '' });
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!order) return;
+    setForm({ paymentType: 'TRANSFER', dueDays: 14, note: '' });
+    setError('');
+  }, [order]);
+
+  const handleIssue = async () => {
+    const dueDays = form.dueDays === '' ? null : Number(form.dueDays);
+    if (dueDays !== null && (Number.isNaN(dueDays) || dueDays < 0 || dueDays > 365)) {
+      setError('Splatnost musí být v rozsahu 0–365 dnů.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      const { data } = await client.post('/invoices', {
+        orderId: order.id,
+        paymentType: form.paymentType,
+        dueDays,
+        note: form.note || null,
+      });
+      onIssued(data);
+      onClose();
+    } catch (e) {
+      setError(
+        e.response?.data?.message || 'Vystavení faktury se nezdařilo. Faktura k objednávce již možná existuje.'
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={!!order} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Vystavit fakturu k objednávce {order?.orderNumber}</DialogTitle>
+      <DialogContent dividers>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              select
+              label="Způsob platby"
+              value={form.paymentType}
+              onChange={(e) => setForm((f) => ({ ...f, paymentType: e.target.value }))}
+              required
+              fullWidth
+            >
+              {Object.entries(INVOICE_PAYMENT_LABELS).map(([value, label]) => (
+                <MenuItem key={value} value={value}>
+                  {label}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              label="Splatnost (dny)"
+              type="number"
+              value={form.dueDays}
+              onChange={(e) => setForm((f) => ({ ...f, dueDays: e.target.value }))}
+              fullWidth
+              inputProps={{ min: 0, max: 365 }}
+              helperText="Prázdné = výchozích 14 dnů"
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <TextField
+              label="Poznámka na faktuře"
+              value={form.note}
+              onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
+              fullWidth
+              multiline
+              minRows={2}
+              inputProps={{ maxLength: 255 }}
+            />
+          </Grid>
+        </Grid>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Zrušit</Button>
+        <Button variant="contained" onClick={handleIssue} disabled={saving}>
+          {saving ? 'Vystavuji…' : 'Vystavit fakturu'}
         </Button>
       </DialogActions>
     </Dialog>
@@ -492,6 +615,7 @@ export default function OrdersPage() {
   const [snack, setSnack] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState(null);
+  const [invoicingOrder, setInvoicingOrder] = useState(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -511,6 +635,21 @@ export default function OrdersPage() {
   }, [page, size, filters]);
 
   useEffect(load, [load]);
+
+  // Downloads the printable PDF of the order from the reporting API.
+  const handlePrint = async (order) => {
+    try {
+      const res = await client.get(`/reports/order/${order.id}/print`, { responseType: 'blob' });
+      const url = URL.createObjectURL(res.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `objednavka-${order.orderNumber}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError('Tisk objednávky se nezdařil.');
+    }
+  };
 
   const handleStatusChange = async (order, status) => {
     try {
@@ -570,6 +709,8 @@ export default function OrdersPage() {
                 order={o}
                 onStatusChange={handleStatusChange}
                 onEditItems={setEditingOrder}
+                onPrint={handlePrint}
+                onIssueInvoice={setInvoicingOrder}
               />
             ))}
             {orders.length === 0 && !loading && (
@@ -604,6 +745,13 @@ export default function OrdersPage() {
         onSaved={() => {
           setSnack('Položky objednávky byly upraveny.');
           load();
+        }}
+      />
+      <IssueInvoiceDialog
+        order={invoicingOrder}
+        onClose={() => setInvoicingOrder(null)}
+        onIssued={(invoice) => {
+          setSnack(`Faktura ${invoice.invoiceNumber} byla vystavena.`);
         }}
       />
       <NewOrderDialog

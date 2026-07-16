@@ -27,6 +27,8 @@ import StarIcon from '@mui/icons-material/Star';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PeopleIcon from '@mui/icons-material/People';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
 import EventIcon from '@mui/icons-material/Event';
 import CampaignIcon from '@mui/icons-material/Campaign';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
@@ -132,6 +134,7 @@ export default function Layout({ children }) {
     { to: '/', label: 'Dashboard', icon: <DashboardIcon /> },
     { to: '/customers', label: 'Zákazníci', icon: <PeopleIcon /> },
     { to: '/orders', label: 'Objednávky', icon: <ShoppingCartIcon /> },
+    { to: '/invoices', label: 'Faktury', icon: <ReceiptLongIcon /> },
     { to: '/meetings', label: 'Schůzky', icon: <EventIcon /> },
     { to: '/items', label: 'Položky', icon: <Inventory2Icon /> },
     ...(isOwner ? [{ to: '/campaigns', label: 'Kampaně', icon: <CampaignIcon /> }] : []),
@@ -144,6 +147,7 @@ export default function Layout({ children }) {
         { to: '/admin/companies', label: 'Společnosti', icon: <BusinessIcon /> },
         { to: '/admin/countries', label: 'Země', icon: <PublicIcon /> },
         { to: '/admin/vat-rates', label: 'Sazby DPH', icon: <PercentIcon /> },
+        { to: '/admin/number-sequences', label: 'Číselné řady', icon: <FormatListNumberedIcon /> },
         { to: '/admin/sales-representatives', label: 'Obchodní zástupci', icon: <BadgeIcon /> },
         { to: '/users', label: 'Uživatelé', icon: <ManageAccountsIcon /> },
       ]

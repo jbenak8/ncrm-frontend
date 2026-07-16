@@ -38,6 +38,16 @@ export const CAMPAIGN_STATUS_LABELS = {
   CANCELLED: 'Zrušená',
 };
 
+export const INVOICE_PAYMENT_LABELS = {
+  CASH: 'Hotově',
+  TRANSFER: 'Převodem',
+};
+
+export const NUMBER_SEQUENCE_TYPE_LABELS = {
+  ORDER: 'Objednávky',
+  INVOICE: 'Faktury',
+};
+
 export const STATUS_COLORS = {
   NEW: 'info',
   CONFIRMED: 'primary',

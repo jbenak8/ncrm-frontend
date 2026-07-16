@@ -11,6 +11,7 @@ import DashboardPage from './pages/DashboardPage';
 import CustomersPage from './pages/CustomersPage';
 import CustomerDetailPage from './pages/CustomerDetailPage';
 import OrdersPage from './pages/OrdersPage';
+import InvoicesPage from './pages/InvoicesPage';
 import MeetingsPage from './pages/MeetingsPage';
 import CampaignsPage from './pages/CampaignsPage';
 import ItemsPage from './pages/ItemsPage';
@@ -20,6 +21,7 @@ import CompaniesPage from './pages/admin/CompaniesPage';
 import CountriesPage from './pages/admin/CountriesPage';
 import VatRatesPage from './pages/admin/VatRatesPage';
 import SalesRepresentativesPage from './pages/admin/SalesRepresentativesPage';
+import NumberSequencesPage from './pages/admin/NumberSequencesPage';
 
 function FullScreenLoader() {
   return (
@@ -62,6 +64,7 @@ export default function App() {
           <Route path="/customers" element={<CustomersPage />} />
           <Route path="/customers/:id" element={<CustomerDetailPage />} />
           <Route path="/orders" element={<OrdersPage />} />
+          <Route path="/invoices" element={<InvoicesPage />} />
           <Route path="/meetings" element={<MeetingsPage />} />
           <Route path="/items" element={<ItemsPage />} />
           <Route path="/ai-chat" element={<AiChatPage />} />
@@ -70,6 +73,7 @@ export default function App() {
           {isOwner && <Route path="/admin/companies" element={<CompaniesPage />} />}
           {isOwner && <Route path="/admin/countries" element={<CountriesPage />} />}
           {isOwner && <Route path="/admin/vat-rates" element={<VatRatesPage />} />}
+          {isOwner && <Route path="/admin/number-sequences" element={<NumberSequencesPage />} />}
           {isOwner && (
             <Route path="/admin/sales-representatives" element={<SalesRepresentativesPage />} />
           )}
