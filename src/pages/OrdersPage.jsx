@@ -23,10 +23,12 @@ import {
   TablePagination,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import dayjs from 'dayjs';
@@ -50,6 +52,9 @@ const SEARCH_FIELDS = [
   { name: 'note', label: 'Poznámka', type: 'text' },
 ];
 
+// Order items may be modified only while the order is new or confirmed.
+const EDITABLE_STATUSES = ['NEW', 'CONFIRMED'];
+
 const NEXT_STATUSES = {
   NEW: ['CONFIRMED', 'CANCELLED'],
   CONFIRMED: ['IN_PROGRESS', 'CANCELLED'],
@@ -58,7 +63,7 @@ const NEXT_STATUSES = {
   CANCELLED: [],
 };
 
-function OrderRow({ order, onStatusChange }) {
+function OrderRow({ order, onStatusChange, onEditItems }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -91,6 +96,13 @@ function OrderRow({ order, onStatusChange }) {
               {ORDER_STATUS_LABELS[s]}
             </Button>
           ))}
+          {EDITABLE_STATUSES.includes(order.status) && (
+            <Tooltip title="Upravit položky objednávky">
+              <IconButton size="small" onClick={() => onEditItems(order)}>
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
         </TableCell>
       </TableRow>
       <TableRow>
@@ -132,6 +144,124 @@ function OrderRow({ order, onStatusChange }) {
         </TableCell>
       </TableRow>
     </>
+  );
+}
+
+/**
+ * Dialog for editing the items of an existing order. It is available only for
+ * orders in the NEW or CONFIRMED status; the updated list is sent to
+ * `PUT /orders/{id}/items`.
+ */
+function EditOrderItemsDialog({ order, onClose, onSaved }) {
+  const [items, setItems] = useState([]);
+  const [rows, setRows] = useState([{ itemId: '', quantity: 1 }]);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!order) return;
+    setError('');
+    setRows(
+      (order.items || []).length > 0
+        ? order.items.map((i) => ({ itemId: i.itemId || '', quantity: i.quantity }))
+        : [{ itemId: '', quantity: 1 }]
+    );
+    client
+      .get('/items')
+      .then((res) => setItems(res.data))
+      .catch(() => setItems([]));
+  }, [order]);
+
+  const setRow = (idx, field, value) =>
+    setRows((rs) => rs.map((row, i) => (i === idx ? { ...row, [field]: value } : row)));
+
+  const handleSave = async () => {
+    const validItems = rows.filter((i) => i.itemId && Number(i.quantity) > 0);
+    if (validItems.length === 0) {
+      setError('Objednávka musí obsahovat alespoň jednu položku.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      const { data } = await client.put(`/orders/${order.id}/items`, {
+        items: validItems.map((i) => ({ itemId: i.itemId, quantity: Number(i.quantity) })),
+      });
+      onSaved(data);
+      onClose();
+    } catch {
+      setError('Uložení položek objednávky se nezdařilo.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={!!order} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>Upravit položky objednávky {order?.orderNumber}</DialogTitle>
+      <DialogContent dividers>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+        <Grid container spacing={2}>
+          {rows.map((row, idx) => (
+            <Grid item xs={12} key={idx}>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                <TextField
+                  select
+                  label="Položka"
+                  value={row.itemId}
+                  onChange={(e) => setRow(idx, 'itemId', e.target.value)}
+                  sx={{ flexGrow: 1 }}
+                  size="small"
+                >
+                  {items
+                    .filter((i) => i.active !== false || i.id === row.itemId)
+                    .map((i) => (
+                      <MenuItem key={i.id} value={i.id}>
+                        {i.code} — {i.name}{' '}
+                        {i.price ? `(${formatMoney(i.price.price, i.price.currency)})` : ''}
+                      </MenuItem>
+                    ))}
+                </TextField>
+                <TextField
+                  label="Množství"
+                  type="number"
+                  size="small"
+                  value={row.quantity}
+                  onChange={(e) => setRow(idx, 'quantity', e.target.value)}
+                  inputProps={{ min: 1 }}
+                  sx={{ width: 120 }}
+                />
+                <IconButton
+                  onClick={() => setRows((rs) => rs.filter((_, i) => i !== idx))}
+                  disabled={rows.length === 1}
+                >
+                  <DeleteIcon />
+                </IconButton>
+              </Box>
+            </Grid>
+          ))}
+          <Grid item xs={12}>
+            <Button
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={() => setRows((rs) => [...rs, { itemId: '', quantity: 1 }])}
+            >
+              Přidat položku
+            </Button>
+          </Grid>
+        </Grid>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Zrušit</Button>
+        <Button variant="contained" onClick={handleSave} disabled={saving}>
+          {saving ? 'Ukládám…' : 'Uložit'}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
@@ -361,6 +491,7 @@ export default function OrdersPage() {
   const [error, setError] = useState('');
   const [snack, setSnack] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingOrder, setEditingOrder] = useState(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -434,7 +565,12 @@ export default function OrdersPage() {
           </TableHead>
           <TableBody>
             {orders.map((o) => (
-              <OrderRow key={o.id} order={o} onStatusChange={handleStatusChange} />
+              <OrderRow
+                key={o.id}
+                order={o}
+                onStatusChange={handleStatusChange}
+                onEditItems={setEditingOrder}
+              />
             ))}
             {orders.length === 0 && !loading && (
               <TableRow>
@@ -462,6 +598,14 @@ export default function OrdersPage() {
         />
       </TableContainer>
 
+      <EditOrderItemsDialog
+        order={editingOrder}
+        onClose={() => setEditingOrder(null)}
+        onSaved={() => {
+          setSnack('Položky objednávky byly upraveny.');
+          load();
+        }}
+      />
       <NewOrderDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
