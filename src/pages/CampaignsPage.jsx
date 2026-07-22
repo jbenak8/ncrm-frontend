@@ -37,6 +37,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import client from '../api/client';
+import { useCompany } from '../company/CompanyContext';
 import SearchFilterBar from '../components/SearchFilterBar';
 import { CAMPAIGN_STATUS_LABELS, formatDateTime, STATUS_COLORS } from '../utils/format';
 
@@ -144,6 +145,7 @@ function CampaignRow({ campaign, onSend, onCancel }) {
 }
 
 function NewCampaignDialog({ open, onClose, onSaved }) {
+  const { activeCompany } = useCompany() || {};
   const [customers, setCustomers] = useState([]);
   const [form, setForm] = useState({
     name: '',
@@ -214,6 +216,8 @@ function NewCampaignDialog({ open, onClose, onSaved }) {
         subject: form.subject,
         body: form.body,
         contentSource: form.contentSource,
+        // Own company sending the campaign; the backend falls back to the default company.
+        companyId: activeCompany?.id || null,
         scheduledAt: form.scheduledAt ? new Date(form.scheduledAt).toISOString() : null,
         customerIds: form.customerIds,
       });
@@ -377,6 +381,7 @@ function NewCampaignDialog({ open, onClose, onSaved }) {
 }
 
 export default function CampaignsPage() {
+  const { activeCompany } = useCompany() || {};
   const [campaigns, setCampaigns] = useState([]);
   const [filters, setFilters] = useState([]);
   const [page, setPage] = useState(0);
@@ -393,6 +398,8 @@ export default function CampaignsPage() {
     params.set('page', page);
     params.set('size', size);
     params.set('sort', 'name,asc');
+    // The list is scoped to the currently selected own company.
+    if (activeCompany) params.append('filter', `company.id:eq:${activeCompany.id}`);
     filters.forEach((f) => params.append('filter', f));
     client
       .get('/campaigns/search', { params })
@@ -402,7 +409,7 @@ export default function CampaignsPage() {
       })
       .catch(() => setError('Nepodařilo se načíst kampaně.'))
       .finally(() => setLoading(false));
-  }, [page, size, filters]);
+  }, [page, size, filters, activeCompany]);
 
   useEffect(load, [load]);
 

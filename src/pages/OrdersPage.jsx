@@ -30,11 +30,14 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import SearchIcon from '@mui/icons-material/Search';
 import PrintIcon from '@mui/icons-material/Print';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import dayjs from 'dayjs';
 import client from '../api/client';
+import { useCompany } from '../company/CompanyContext';
+import ItemPickerDialog from '../components/ItemPickerDialog';
 import SearchFilterBar from '../components/SearchFilterBar';
 import {
   formatDateTime,
@@ -48,6 +51,7 @@ import {
 const SEARCH_FIELDS = [
   { name: 'orderNumber', label: 'Číslo objednávky', type: 'text' },
   { name: 'customer.name', label: 'Zákazník', type: 'text' },
+  { name: 'company.name', label: 'Společnost', type: 'text' },
   { name: 'orderDate', label: 'Datum', type: 'date' },
   { name: 'totalPrice', label: 'Cena', type: 'number' },
   { name: 'currency', label: 'Měna', type: 'text' },
@@ -83,6 +87,7 @@ function OrderRow({ order, onStatusChange, onEditItems, onPrint, onIssueInvoice 
         </TableCell>
         <TableCell>{order.orderNumber}</TableCell>
         <TableCell>{order.customerName}</TableCell>
+        <TableCell>{order.companyName || '—'}</TableCell>
         <TableCell>{order.salesRepresentativeName || '—'}</TableCell>
         <TableCell>{formatDateTime(order.orderDate)}</TableCell>
         <TableCell align="right">{formatMoney(order.totalPrice, order.currency)}</TableCell>
@@ -126,7 +131,7 @@ function OrderRow({ order, onStatusChange, onEditItems, onPrint, onIssueInvoice 
         </TableCell>
       </TableRow>
       <TableRow>
-        <TableCell colSpan={8} sx={{ py: 0, borderBottom: open ? undefined : 'none' }}>
+        <TableCell colSpan={9} sx={{ py: 0, borderBottom: open ? undefined : 'none' }}>
           <Collapse in={open} timeout="auto" unmountOnExit>
             <Box sx={{ my: 1 }}>
               <Typography variant="subtitle2" gutterBottom>
@@ -169,14 +174,15 @@ function OrderRow({ order, onStatusChange, onEditItems, onPrint, onIssueInvoice 
 
 /**
  * Dialog for editing the items of an existing order. It is available only for
- * orders in the NEW or CONFIRMED status; the updated list is sent to
- * `PUT /orders/{id}/items`.
+ * orders in the NEW or CONFIRMED status; the whole order (with the updated item
+ * list) is sent to `PUT /orders/{id}`.
  */
 function EditOrderItemsDialog({ order, onClose, onSaved }) {
   const [items, setItems] = useState([]);
   const [rows, setRows] = useState([{ itemId: '', quantity: 1 }]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     if (!order) return;
@@ -195,6 +201,20 @@ function EditOrderItemsDialog({ order, onClose, onSaved }) {
   const setRow = (idx, field, value) =>
     setRows((rs) => rs.map((row, i) => (i === idx ? { ...row, [field]: value } : row)));
 
+  // Adds the items picked in the search dialog as new rows; already present
+  // items are skipped and blank rows are dropped.
+  const handlePicked = (picked) => {
+    setItems((list) => [...list, ...picked.filter((p) => !list.some((i) => i.id === p.id))]);
+    setRows((rs) => {
+      const kept = rs.filter((r) => r.itemId);
+      const added = picked
+        .filter((p) => !kept.some((r) => r.itemId === p.id))
+        .map((p) => ({ itemId: p.id, quantity: 1 }));
+      const next = [...kept, ...added];
+      return next.length > 0 ? next : [{ itemId: '', quantity: 1 }];
+    });
+  };
+
   const handleSave = async () => {
     const validItems = rows.filter((i) => i.itemId && Number(i.quantity) > 0);
     if (validItems.length === 0) {
@@ -204,7 +224,16 @@ function EditOrderItemsDialog({ order, onClose, onSaved }) {
     setSaving(true);
     setError('');
     try {
-      const { data } = await client.put(`/orders/${order.id}/items`, {
+      // The backend accepts only a full order update, so the unchanged header
+      // fields are sent along with the edited item list.
+      const { data } = await client.put(`/orders/${order.id}`, {
+        customerId: order.customerId,
+        companyId: order.companyId || null,
+        contactPersonId: order.contactPersonId || null,
+        salesRepresentativeId: order.salesRepresentativeId,
+        orderDate: order.orderDate,
+        currency: order.currency,
+        note: order.note || null,
         items: validItems.map((i) => ({ itemId: i.itemId, quantity: Number(i.quantity) })),
       });
       onSaved(data);
@@ -272,8 +301,16 @@ function EditOrderItemsDialog({ order, onClose, onSaved }) {
             >
               Přidat položku
             </Button>
+            <Button size="small" startIcon={<SearchIcon />} onClick={() => setPickerOpen(true)}>
+              Vyhledat zboží
+            </Button>
           </Grid>
         </Grid>
+        <ItemPickerDialog
+          open={pickerOpen}
+          onClose={() => setPickerOpen(false)}
+          onAdd={handlePicked}
+        />
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Zrušit</Button>
@@ -389,6 +426,7 @@ function IssueInvoiceDialog({ order, onClose, onIssued }) {
 }
 
 function NewOrderDialog({ open, onClose, onSaved }) {
+  const { activeCompany } = useCompany() || {};
   const [customers, setCustomers] = useState([]);
   const [reps, setReps] = useState([]);
   const [items, setItems] = useState([]);
@@ -402,10 +440,14 @@ function NewOrderDialog({ open, onClose, onSaved }) {
   });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  // Customer's most recent order, offered as a template for the item rows.
+  const [lastOrder, setLastOrder] = useState(null);
 
   useEffect(() => {
     if (!open) return;
     setError('');
+    setLastOrder(null);
     setForm({
       customerId: '',
       salesRepresentativeId: '',
@@ -428,11 +470,56 @@ function NewOrderDialog({ open, onClose, onSaved }) {
       .catch(() => setItems([]));
   }, [open]);
 
+  // After a customer is picked, look up their most recent order so its items
+  // (including quantities) can be offered as a prefill.
+  useEffect(() => {
+    setLastOrder(null);
+    if (!open || !form.customerId) return;
+    const params = new URLSearchParams();
+    params.set('page', 0);
+    params.set('size', 1);
+    params.set('sort', 'orderDate,desc');
+    params.append('filter', `customer.id:eq:${form.customerId}`);
+    client
+      .get('/orders/search', { params })
+      .then((res) => {
+        const order = (res.data.content || [])[0];
+        if (order && (order.items || []).some((i) => i.itemId)) setLastOrder(order);
+      })
+      .catch(() => setLastOrder(null));
+  }, [open, form.customerId]);
+
+  // Replaces the item rows with the items of the customer's last order.
+  const handlePrefillFromLastOrder = () => {
+    if (!lastOrder) return;
+    const rows = (lastOrder.items || [])
+      .filter((i) => i.itemId)
+      .map((i) => ({ itemId: i.itemId, quantity: i.quantity }));
+    if (rows.length > 0) {
+      setForm((f) => ({ ...f, items: rows }));
+    }
+    setLastOrder(null);
+  };
+
   const setItemRow = (idx, field, value) =>
     setForm((f) => ({
       ...f,
       items: f.items.map((row, i) => (i === idx ? { ...row, [field]: value } : row)),
     }));
+
+  // Adds the items picked in the search dialog as new rows; already present
+  // items are skipped and blank rows are dropped.
+  const handlePicked = (picked) => {
+    setItems((list) => [...list, ...picked.filter((p) => !list.some((i) => i.id === p.id))]);
+    setForm((f) => {
+      const kept = f.items.filter((r) => r.itemId);
+      const added = picked
+        .filter((p) => !kept.some((r) => r.itemId === p.id))
+        .map((p) => ({ itemId: p.id, quantity: 1 }));
+      const next = [...kept, ...added];
+      return { ...f, items: next.length > 0 ? next : [{ itemId: '', quantity: 1 }] };
+    });
+  };
 
   const handleSave = async () => {
     const validItems = form.items.filter((i) => i.itemId && Number(i.quantity) > 0);
@@ -445,6 +532,8 @@ function NewOrderDialog({ open, onClose, onSaved }) {
     try {
       const { data } = await client.post('/orders', {
         customerId: form.customerId,
+        // Own company issuing the order; the backend falls back to the default company.
+        companyId: activeCompany?.id || null,
         salesRepresentativeId: form.salesRepresentativeId,
         orderDate: new Date(form.orderDate).toISOString(),
         currency: form.currency,
@@ -531,6 +620,23 @@ function NewOrderDialog({ open, onClose, onSaved }) {
           <Grid item xs={12}>
             <Typography variant="subtitle2">Položky</Typography>
           </Grid>
+          {lastOrder && (
+            <Grid item xs={12}>
+              <Alert
+                severity="info"
+                onClose={() => setLastOrder(null)}
+                action={
+                  <Button color="inherit" size="small" onClick={handlePrefillFromLastOrder}>
+                    Předvyplnit
+                  </Button>
+                }
+              >
+                Zákazník má poslední objednávku {lastOrder.orderNumber} (
+                {formatDateTime(lastOrder.orderDate)}) — chcete převzít její položky včetně
+                množství?
+              </Alert>
+            </Grid>
+          )}
           {form.items.map((row, idx) => (
             <Grid item xs={12} key={idx}>
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
@@ -543,7 +649,7 @@ function NewOrderDialog({ open, onClose, onSaved }) {
                   size="small"
                 >
                   {items
-                    .filter((i) => i.active !== false)
+                    .filter((i) => i.active !== false || i.id === row.itemId)
                     .map((i) => (
                       <MenuItem key={i.id} value={i.id}>
                         {i.code} — {i.name}{' '}
@@ -581,6 +687,9 @@ function NewOrderDialog({ open, onClose, onSaved }) {
             >
               Přidat položku
             </Button>
+            <Button size="small" startIcon={<SearchIcon />} onClick={() => setPickerOpen(true)}>
+              Vyhledat zboží
+            </Button>
           </Grid>
           <Grid item xs={12}>
             <TextField
@@ -593,6 +702,11 @@ function NewOrderDialog({ open, onClose, onSaved }) {
             />
           </Grid>
         </Grid>
+        <ItemPickerDialog
+          open={pickerOpen}
+          onClose={() => setPickerOpen(false)}
+          onAdd={handlePicked}
+        />
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Zrušit</Button>
@@ -605,6 +719,7 @@ function NewOrderDialog({ open, onClose, onSaved }) {
 }
 
 export default function OrdersPage() {
+  const { activeCompany } = useCompany() || {};
   const [orders, setOrders] = useState([]);
   const [filters, setFilters] = useState([]);
   const [page, setPage] = useState(0);
@@ -623,6 +738,8 @@ export default function OrdersPage() {
     params.set('page', page);
     params.set('size', size);
     params.set('sort', 'orderDate,desc');
+    // The list is scoped to the currently selected own company.
+    if (activeCompany) params.append('filter', `company.id:eq:${activeCompany.id}`);
     filters.forEach((f) => params.append('filter', f));
     client
       .get('/orders/search', { params })
@@ -632,7 +749,7 @@ export default function OrdersPage() {
       })
       .catch(() => setError('Nepodařilo se načíst objednávky.'))
       .finally(() => setLoading(false));
-  }, [page, size, filters]);
+  }, [page, size, filters, activeCompany]);
 
   useEffect(load, [load]);
 
@@ -695,6 +812,7 @@ export default function OrdersPage() {
               <TableCell />
               <TableCell>Číslo</TableCell>
               <TableCell>Zákazník</TableCell>
+              <TableCell>Společnost</TableCell>
               <TableCell>Zástupce</TableCell>
               <TableCell>Datum</TableCell>
               <TableCell align="right">Cena</TableCell>
@@ -715,7 +833,7 @@ export default function OrdersPage() {
             ))}
             {orders.length === 0 && !loading && (
               <TableRow>
-                <TableCell colSpan={8} align="center">
+                <TableCell colSpan={9} align="center">
                   <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
                     Žádné objednávky.
                   </Typography>

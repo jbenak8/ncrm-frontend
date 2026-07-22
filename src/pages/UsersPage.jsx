@@ -36,6 +36,7 @@ import LockOpenIcon from '@mui/icons-material/LockOpen';
 import ToggleOnIcon from '@mui/icons-material/ToggleOn';
 import ToggleOffIcon from '@mui/icons-material/ToggleOff';
 import client from '../api/client';
+import { useCompany } from '../company/CompanyContext';
 import SearchFilterBar from '../components/SearchFilterBar';
 import { formatDateTime } from '../utils/format';
 import { isPasswordValid, PASSWORD_POLICY_DESCRIPTION } from '../utils/password';
@@ -69,9 +70,11 @@ const emptyForm = {
   mustChangePassword: true,
   sendCredentials: false,
   roles: ['CUSTOMER'],
+  companyIds: [],
 };
 
 export default function UsersPage() {
+  const { companies } = useCompany();
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [filters, setFilters] = useState([]);
@@ -152,6 +155,7 @@ export default function UsersPage() {
             mustChangePassword: !!user.mustChangePassword,
             sendCredentials: false,
             roles: user.roles && user.roles.length > 0 ? user.roles : ['CUSTOMER'],
+            companyIds: user.companyIds || [],
           }
         : emptyForm
     );
@@ -393,6 +397,29 @@ export default function UsersPage() {
                 {roles.map((r) => (
                   <MenuItem key={r.name} value={r.name}>
                     {ROLE_LABELS[r.name] || r.description || r.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                select
+                label="Přiřazené společnosti"
+                value={form.companyIds}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    companyIds:
+                      typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value,
+                  }))
+                }
+                SelectProps={{ multiple: true }}
+                fullWidth
+                helperText="Bez přiřazení vidí uživatel data všech společností."
+              >
+                {companies.map((c) => (
+                  <MenuItem key={c.id} value={c.id}>
+                    {c.name}
                   </MenuItem>
                 ))}
               </TextField>

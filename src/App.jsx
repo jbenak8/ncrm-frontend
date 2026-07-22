@@ -11,6 +11,7 @@ import DashboardPage from './pages/DashboardPage';
 import CustomersPage from './pages/CustomersPage';
 import CustomerDetailPage from './pages/CustomerDetailPage';
 import OrdersPage from './pages/OrdersPage';
+import QuotationsPage from './pages/QuotationsPage';
 import InvoicesPage from './pages/InvoicesPage';
 import MeetingsPage from './pages/MeetingsPage';
 import CampaignsPage from './pages/CampaignsPage';
@@ -63,6 +64,7 @@ export default function App() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/customers" element={<CustomersPage />} />
           <Route path="/customers/:id" element={<CustomerDetailPage />} />
+          <Route path="/quotations" element={<QuotationsPage />} />
           <Route path="/orders" element={<OrdersPage />} />
           <Route path="/invoices" element={<InvoicesPage />} />
           <Route path="/meetings" element={<MeetingsPage />} />

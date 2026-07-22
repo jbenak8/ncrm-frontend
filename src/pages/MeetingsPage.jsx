@@ -31,6 +31,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import dayjs from 'dayjs';
 import client from '../api/client';
+import { useCompany } from '../company/CompanyContext';
 import SearchFilterBar from '../components/SearchFilterBar';
 import { formatDateTime, MEETING_STATUS_LABELS, STATUS_COLORS } from '../utils/format';
 
@@ -50,6 +51,7 @@ const SEARCH_FIELDS = [
 ];
 
 function MeetingFormDialog({ open, meeting, onClose, onSaved }) {
+  const { activeCompany } = useCompany() || {};
   const [customers, setCustomers] = useState([]);
   const [reps, setReps] = useState([]);
   const [form, setForm] = useState(null);
@@ -92,6 +94,8 @@ function MeetingFormDialog({ open, meeting, onClose, onSaved }) {
     try {
       const payload = {
         customerId: form.customerId,
+        // Own company holding the meeting; the backend falls back to the default company.
+        companyId: meeting ? meeting.companyId || null : activeCompany?.id || null,
         salesRepresentativeId: form.salesRepresentativeId,
         subject: form.subject,
         description: form.description || null,
@@ -252,6 +256,7 @@ function CompleteDialog({ open, meeting, onClose, onCompleted }) {
 }
 
 export default function MeetingsPage() {
+  const { activeCompany } = useCompany() || {};
   const [meetings, setMeetings] = useState([]);
   const [filters, setFilters] = useState([]);
   const [page, setPage] = useState(0);
@@ -270,6 +275,8 @@ export default function MeetingsPage() {
     params.set('page', page);
     params.set('size', size);
     params.set('sort', 'plannedDate,desc');
+    // The list is scoped to the currently selected own company.
+    if (activeCompany) params.append('filter', `company.id:eq:${activeCompany.id}`);
     filters.forEach((f) => params.append('filter', f));
     client
       .get('/meetings/search', { params })
@@ -279,7 +286,7 @@ export default function MeetingsPage() {
       })
       .catch(() => setError('Nepodařilo se načíst schůzky.'))
       .finally(() => setLoading(false));
-  }, [page, size, filters]);
+  }, [page, size, filters, activeCompany]);
 
   useEffect(load, [load]);
 

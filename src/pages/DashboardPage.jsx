@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
   Card,
   CardContent,
+  Checkbox,
   Chip,
   CircularProgress,
+  FormControlLabel,
   Grid,
   Table,
   TableBody,
@@ -26,6 +28,8 @@ import {
 } from 'recharts';
 import client from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { useCompany } from '../company/CompanyContext';
+import { filterByCompanyIds } from '../utils/companyFilter';
 import {
   formatDateTime,
   formatMoney,
@@ -66,19 +70,34 @@ function StatCard({ title, value, subtitle }) {
   );
 }
 
-function OwnerDashboard() {
+function OwnerDashboard({ filterByCompany }) {
   const [data, setData] = useState(null);
+  const [invoices, setInvoices] = useState(null);
+  const [orders, setOrders] = useState(null);
+  const [meetings, setMeetings] = useState(null);
+  const [campaigns, setCampaigns] = useState(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    client
-      .get('/dashboard')
-      .then((res) => setData(res.data))
+    Promise.all([
+      client.get('/dashboard'),
+      client.get('/invoices'),
+      client.get('/orders'),
+      client.get('/meetings'),
+      client.get('/campaigns'),
+    ])
+      .then(([d, i, o, m, c]) => {
+        setData(d.data);
+        setInvoices(i.data);
+        setOrders(o.data);
+        setMeetings(m.data);
+        setCampaigns(c.data);
+      })
       .catch(() => setError('Nepodařilo se načíst data dashboardu.'));
   }, []);
 
   if (error) return <Alert severity="error">{error}</Alert>;
-  if (!data)
+  if (!data || !invoices || !orders || !meetings || !campaigns)
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', mt: 6 }}>
         <CircularProgress />
@@ -86,6 +105,87 @@ function OwnerDashboard() {
     );
 
   const s = data.summary || {};
+  // Všechna data závislá na společnosti (objednávky, faktury, schůzky, kampaně)
+  // jsou omezena na vybranou společnost (viz checkbox Zobrazit vše).
+  const visibleOrders = filterByCompany(orders);
+  const visibleInvoices = filterByCompany(invoices);
+  const visibleMeetings = filterByCompany(meetings);
+  const visibleAllCampaigns = filterByCompany(campaigns);
+  const visibleCampaigns = filterByCompany(data.activeCampaigns || []);
+  const openOrders = visibleOrders.filter(
+    (o) => !['COMPLETED', 'CANCELLED'].includes(o.status)
+  );
+  // Hodnota objednávek vybrané společnosti (bez zrušených).
+  const ordersRevenue = visibleOrders
+    .filter((o) => o.status !== 'CANCELLED')
+    .reduce((sum, o) => sum + (o.totalPrice ?? 0), 0);
+  const plannedMeetings = visibleMeetings.filter((m) => m.status === 'PLANNED').length;
+  const completedMeetings = visibleMeetings.filter((m) => m.status === 'COMPLETED').length;
+  const sentCampaigns = visibleAllCampaigns.filter((c) => c.status === 'SENT').length;
+  // Tržby = součet vystavených faktur (fakturované objednávky).
+  const invoicedRevenue = visibleInvoices.reduce((sum, inv) => sum + (inv.totalGross ?? 0), 0);
+  // Tržby po měsících z vystavených faktur (klíč = YYYY-MM data vystavení).
+  const invoicedByMonth = visibleInvoices.reduce((acc, inv) => {
+    const month = (inv.issueDate || '').slice(0, 7);
+    if (month) acc[month] = (acc[month] ?? 0) + (inv.totalGross ?? 0);
+    return acc;
+  }, {});
+  // Objednávky po měsících z objednávek vybrané společnosti (klíč = YYYY-MM data objednávky).
+  const ordersByMonthMap = visibleOrders
+    .filter((o) => o.status !== 'CANCELLED')
+    .reduce((acc, o) => {
+      const month = (o.orderDate || '').slice(0, 7);
+      if (!month) return acc;
+      acc[month] = acc[month] || { month, orderCount: 0, revenue: 0 };
+      acc[month].orderCount += 1;
+      acc[month].revenue += o.totalPrice ?? 0;
+      return acc;
+    }, {});
+  const ordersByMonth = Object.values(ordersByMonthMap)
+    .sort((a, b) => a.month.localeCompare(b.month))
+    .map((m) => ({ ...m, invoicedRevenue: invoicedByMonth[m.month] ?? 0 }));
+  // Top zákazníci podle objednávek vybrané společnosti.
+  const topCustomers = Object.values(
+    visibleOrders
+      .filter((o) => o.status !== 'CANCELLED')
+      .reduce((acc, o) => {
+        acc[o.customerId] = acc[o.customerId] || {
+          customerId: o.customerId,
+          name: o.customerName,
+          orderCount: 0,
+          revenue: 0,
+        };
+        acc[o.customerId].orderCount += 1;
+        acc[o.customerId].revenue += o.totalPrice ?? 0;
+        return acc;
+      }, {})
+  )
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 5);
+  // Výkon obchodních zástupců podle objednávek a schůzek vybrané společnosti.
+  const salesByRepresentative = Object.values(
+    [...visibleOrders.filter((o) => o.status !== 'CANCELLED'), ...visibleMeetings].reduce(
+      (acc, item) => {
+        const id = item.salesRepresentativeId;
+        if (!id) return acc;
+        acc[id] = acc[id] || {
+          salesRepresentativeId: id,
+          name: item.salesRepresentativeName,
+          orderCount: 0,
+          revenue: 0,
+          meetingCount: 0,
+        };
+        if (item.orderNumber) {
+          acc[id].orderCount += 1;
+          acc[id].revenue += item.totalPrice ?? 0;
+        } else {
+          acc[id].meetingCount += 1;
+        }
+        return acc;
+      },
+      {}
+    )
+  ).sort((a, b) => b.revenue - a.revenue);
   return (
     <Grid container spacing={2}>
       <Grid item xs={12} sm={6} md={3}>
@@ -98,18 +198,22 @@ function OwnerDashboard() {
       <Grid item xs={12} sm={6} md={3}>
         <StatCard
           title="Objednávky"
-          value={s.totalOrders ?? 0}
-          subtitle={`${s.openOrders ?? 0} otevřených`}
+          value={visibleOrders.length}
+          subtitle={`${openOrders.length} otevřených`}
         />
       </Grid>
       <Grid item xs={12} sm={6} md={3}>
-        <StatCard title="Tržby celkem" value={formatMoney(s.totalRevenue)} />
+        <StatCard
+          title="Tržby celkem"
+          value={formatMoney(invoicedRevenue)}
+          subtitle={`Hodnota objednávek celkem: ${formatMoney(ordersRevenue)}`}
+        />
       </Grid>
       <Grid item xs={12} sm={6} md={3}>
         <StatCard
           title="Schůzky"
-          value={s.plannedMeetings ?? 0}
-          subtitle={`${s.completedMeetings ?? 0} dokončených, ${s.sentCampaigns ?? 0} kampaní odesláno`}
+          value={plannedMeetings}
+          subtitle={`${completedMeetings} dokončených, ${sentCampaigns} kampaní odesláno`}
         />
       </Grid>
 
@@ -120,7 +224,7 @@ function OwnerDashboard() {
               Objednávky a tržby po měsících
             </Typography>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={data.ordersByMonth || []}>
+              <BarChart data={ordersByMonth}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis yAxisId="left" />
@@ -128,7 +232,8 @@ function OwnerDashboard() {
                 <Tooltip />
                 <Legend />
                 <Bar yAxisId="left" dataKey="orderCount" name="Objednávky" fill="#1565c0" />
-                <Bar yAxisId="right" dataKey="revenue" name="Tržby" fill="#00897b" />
+                <Bar yAxisId="right" dataKey="invoicedRevenue" name="Tržby" fill="#00897b" />
+                <Bar yAxisId="right" dataKey="revenue" name="Hodnota objednávek" fill="#f9a825" />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -146,11 +251,11 @@ function OwnerDashboard() {
                 <TableRow>
                   <TableCell>Zákazník</TableCell>
                   <TableCell align="right">Objednávek</TableCell>
-                  <TableCell align="right">Tržby</TableCell>
+                  <TableCell align="right">Hodnota objednávek</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {(data.topCustomers || []).map((c) => (
+                {topCustomers.map((c) => (
                   <TableRow key={c.customerId}>
                     <TableCell>{c.name}</TableCell>
                     <TableCell align="right">{c.orderCount}</TableCell>
@@ -169,7 +274,7 @@ function OwnerDashboard() {
             <Typography variant="h6" gutterBottom>
               Aktivní kampaně
             </Typography>
-            {(data.activeCampaigns || []).length === 0 ? (
+            {visibleCampaigns.length === 0 ? (
               <Typography variant="body2" color="text.secondary">
                 Žádné aktivní kampaně.
               </Typography>
@@ -179,16 +284,18 @@ function OwnerDashboard() {
                   <TableRow>
                     <TableCell>Název</TableCell>
                     <TableCell>Předmět</TableCell>
+                    <TableCell>Společnost</TableCell>
                     <TableCell>Stav</TableCell>
                     <TableCell>Naplánováno na</TableCell>
                     <TableCell align="right">Příjemců</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {(data.activeCampaigns || []).map((c) => (
+                  {visibleCampaigns.map((c) => (
                     <TableRow key={c.id}>
                       <TableCell>{c.name}</TableCell>
                       <TableCell>{c.subject}</TableCell>
+                      <TableCell>{c.companyName || '—'}</TableCell>
                       <TableCell>
                         <Chip
                           size="small"
@@ -218,12 +325,12 @@ function OwnerDashboard() {
                 <TableRow>
                   <TableCell>Zástupce</TableCell>
                   <TableCell align="right">Objednávek</TableCell>
-                  <TableCell align="right">Tržby</TableCell>
+                  <TableCell align="right">Hodnota objednávek</TableCell>
                   <TableCell align="right">Schůzek</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {(data.salesByRepresentative || []).map((r) => (
+                {salesByRepresentative.map((r) => (
                   <TableRow key={r.salesRepresentativeId}>
                     <TableCell>{r.name}</TableCell>
                     <TableCell align="right">{r.orderCount}</TableCell>
@@ -240,7 +347,7 @@ function OwnerDashboard() {
   );
 }
 
-function RepresentativeDashboard() {
+function RepresentativeDashboard({ filterByCompany }) {
   const [orders, setOrders] = useState(null);
   const [meetings, setMeetings] = useState(null);
   const [error, setError] = useState('');
@@ -262,15 +369,17 @@ function RepresentativeDashboard() {
       </Box>
     );
 
-  const openOrders = orders.filter((o) => !['COMPLETED', 'CANCELLED'].includes(o.status));
-  const plannedMeetings = meetings
+  // Objednávky a schůzky jsou omezeny na vybranou společnost (viz checkbox Zobrazit vše).
+  const visibleOrders = filterByCompany(orders);
+  const openOrders = visibleOrders.filter((o) => !['COMPLETED', 'CANCELLED'].includes(o.status));
+  const plannedMeetings = filterByCompany(meetings)
     .filter((m) => m.status === 'PLANNED')
     .sort((a, b) => (a.plannedDate || '').localeCompare(b.plannedDate || ''));
 
   return (
     <Grid container spacing={2}>
       <Grid item xs={12} sm={6} md={3}>
-        <StatCard title="Objednávky" value={orders.length} subtitle={`${openOrders.length} otevřených`} />
+        <StatCard title="Objednávky" value={visibleOrders.length} subtitle={`${openOrders.length} otevřených`} />
       </Grid>
       <Grid item xs={12} sm={6} md={3}>
         <StatCard title="Plánované schůzky" value={plannedMeetings.length} />
@@ -328,7 +437,7 @@ function RepresentativeDashboard() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {orders.slice(0, 8).map((o) => (
+                {visibleOrders.slice(0, 8).map((o) => (
                   <TableRow key={o.id}>
                     <TableCell>{o.orderNumber}</TableCell>
                     <TableCell>{o.customerName}</TableCell>
@@ -352,16 +461,52 @@ function RepresentativeDashboard() {
 }
 
 export default function DashboardPage() {
-  const { isOwner, user } = useAuth();
+  const { isOwner, isAdmin, user } = useAuth();
+  const { companies, activeCompany } = useCompany();
+  const [showAll, setShowAll] = useState(false);
   const displayName =
     [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.username || '';
 
+  // Ids of companies whose data may be shown; null means "no restriction".
+  // Default: only the currently active company. "Zobrazit vše": the administrator
+  // sees everything, owner / sales representative the data of their assigned companies.
+  const allowedCompanyIds = useMemo(() => {
+    if (!activeCompany && companies.length === 0) return null;
+    if (showAll) {
+      return isAdmin ? null : companies.map((c) => c.id);
+    }
+    return activeCompany ? [activeCompany.id] : companies.map((c) => c.id);
+  }, [showAll, isAdmin, companies, activeCompany]);
+
+  const filterByCompany = useCallback(
+    (items) => filterByCompanyIds(items, allowedCompanyIds),
+    [allowedCompanyIds]
+  );
+
+  // The checkbox is available to the administrator (all data) and to the owner
+  // (data of all their assigned companies).
+  const showAllToggle = isAdmin || isOwner;
+
   return (
     <Box>
-      <Typography variant="h5" fontWeight={700} gutterBottom>
-        Vítejte, {displayName}
-      </Typography>
-      {isOwner ? <OwnerDashboard /> : <RepresentativeDashboard />}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+        <Typography variant="h5" fontWeight={700} gutterBottom>
+          Vítejte, {displayName}
+        </Typography>
+        {showAllToggle && (
+          <FormControlLabel
+            control={
+              <Checkbox checked={showAll} onChange={(e) => setShowAll(e.target.checked)} />
+            }
+            label="Zobrazit vše"
+          />
+        )}
+      </Box>
+      {isOwner ? (
+        <OwnerDashboard filterByCompany={filterByCompany} />
+      ) : (
+        <RepresentativeDashboard filterByCompany={filterByCompany} />
+      )}
     </Box>
   );
 }

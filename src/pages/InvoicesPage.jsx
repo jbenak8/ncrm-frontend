@@ -27,7 +27,9 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import PrintIcon from '@mui/icons-material/Print';
 import EmailIcon from '@mui/icons-material/Email';
 import client from '../api/client';
+import { useCompany } from '../company/CompanyContext';
 import SearchFilterBar from '../components/SearchFilterBar';
+import { filterByCompanyIds } from '../utils/companyFilter';
 import { formatDate, formatMoney, INVOICE_PAYMENT_LABELS } from '../utils/format';
 import { applyClientFilters } from '../utils/clientFilter';
 
@@ -147,6 +149,7 @@ function InvoiceDetailDialog({ invoice, onClose, onPrint, onSend, sending }) {
  * customer by e-mail. Invoices are issued from completed orders on the Orders page.
  */
 export default function InvoicesPage() {
+  const { activeCompany } = useCompany() || {};
   const [invoices, setInvoices] = useState([]);
   const [filters, setFilters] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -193,7 +196,9 @@ export default function InvoicesPage() {
     }
   };
 
-  const visibleInvoices = applyClientFilters(invoices, filters);
+  // The list is scoped to the currently selected own company.
+  const companyInvoices = filterByCompanyIds(invoices, activeCompany ? [activeCompany.id] : null);
+  const visibleInvoices = applyClientFilters(companyInvoices, filters);
 
   return (
     <Box>

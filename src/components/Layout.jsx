@@ -28,6 +28,7 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import PeopleIcon from '@mui/icons-material/People';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import RequestQuoteIcon from '@mui/icons-material/RequestQuote';
 import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
 import EventIcon from '@mui/icons-material/Event';
 import CampaignIcon from '@mui/icons-material/Campaign';
@@ -95,8 +96,8 @@ export default function Layout({ children }) {
   const [anchorEl, setAnchorEl] = useState(null);
   const [companyAnchorEl, setCompanyAnchorEl] = useState(null);
 
-  // Company switching is only offered to the owner (administrator); sales
-  // representatives and customers are bound to a concrete company.
+  // Company switching is offered to the owner (administrator) and to sales
+  // representatives (limited to their assigned companies); customers have none.
   const showCompanySwitcher = companySelectionAvailable && companies.length > 0;
 
   const companyMenu = (
@@ -133,6 +134,7 @@ export default function Layout({ children }) {
   const navItems = [
     { to: '/', label: 'Dashboard', icon: <DashboardIcon /> },
     { to: '/customers', label: 'Zákazníci', icon: <PeopleIcon /> },
+    { to: '/quotations', label: 'Cenové nabídky', icon: <RequestQuoteIcon /> },
     { to: '/orders', label: 'Objednávky', icon: <ShoppingCartIcon /> },
     { to: '/invoices', label: 'Faktury', icon: <ReceiptLongIcon /> },
     { to: '/meetings', label: 'Schůzky', icon: <EventIcon /> },

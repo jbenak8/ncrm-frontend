@@ -23,6 +23,15 @@ export const ORDER_STATUS_LABELS = {
   CANCELLED: 'Zrušená',
 };
 
+export const QUOTATION_STATUS_LABELS = {
+  NEW: 'Nová',
+  SENT: 'Odeslaná',
+  ACCEPTED: 'Přijatá',
+  REJECTED: 'Odmítnutá',
+  IN_PROGRESS: 'V realizaci',
+  CANCELLED: 'Zrušená',
+};
+
 export const MEETING_STATUS_LABELS = {
   PLANNED: 'Plánovaná',
   IN_PROGRESS: 'Probíhá',
@@ -46,6 +55,7 @@ export const INVOICE_PAYMENT_LABELS = {
 export const NUMBER_SEQUENCE_TYPE_LABELS = {
   ORDER: 'Objednávky',
   INVOICE: 'Faktury',
+  QUOTATION: 'Cenové nabídky',
 };
 
 export const STATUS_COLORS = {
@@ -59,4 +69,6 @@ export const STATUS_COLORS = {
   SCHEDULED: 'info',
   SENDING: 'warning',
   SENT: 'success',
+  ACCEPTED: 'success',
+  REJECTED: 'error',
 };

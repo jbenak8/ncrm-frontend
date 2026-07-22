@@ -40,6 +40,7 @@ const emptyForm = {
   unit: '',
   active: true,
   price: '',
+  purchasePriceNet: '',
   currency: 'CZK',
   vatRate: '',
 };
@@ -114,6 +115,7 @@ export default function ItemFormDialog({ open, item, categories, onClose, onSave
             unit: item.unit || '',
             active: item.active !== false,
             price: item.price?.price ?? '',
+            purchasePriceNet: item.price?.purchasePriceNet ?? '',
             currency: item.price?.currency || 'CZK',
             vatRate: item.price?.vatRate ?? '',
           }
@@ -172,6 +174,7 @@ export default function ItemFormDialog({ open, item, categories, onClose, onSave
         ...form,
         categoryId: form.categoryId || null,
         price: Number(form.price),
+        purchasePriceNet: form.purchasePriceNet === '' ? null : Number(form.purchasePriceNet),
         vatRate: form.vatRate === '' ? null : Number(form.vatRate),
       };
       let { data } = item
@@ -261,6 +264,15 @@ export default function ItemFormDialog({ open, item, categories, onClose, onSave
               value={form.price}
               onChange={set('price')}
               required
+              fullWidth
+            />
+          </Grid>
+          <Grid item xs={12} sm={4}>
+            <TextField
+              label="Nákupní cena bez DPH"
+              type="number"
+              value={form.purchasePriceNet}
+              onChange={set('purchasePriceNet')}
               fullWidth
             />
           </Grid>
