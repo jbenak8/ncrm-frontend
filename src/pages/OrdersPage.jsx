@@ -36,6 +36,7 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import dayjs from 'dayjs';
 import client from '../api/client';
+import { useAuth } from '../auth/AuthContext';
 import { useCompany } from '../company/CompanyContext';
 import ItemPickerDialog from '../components/ItemPickerDialog';
 import SearchFilterBar from '../components/SearchFilterBar';
@@ -427,6 +428,9 @@ function IssueInvoiceDialog({ order, onClose, onIssued }) {
 
 function NewOrderDialog({ open, onClose, onSaved }) {
   const { activeCompany } = useCompany() || {};
+  // A customer orders under their own customer record for the preselected
+  // company, so the customer and sales rep pickers are hidden for them.
+  const { user, isCustomer } = useAuth();
   const [customers, setCustomers] = useState([]);
   const [reps, setReps] = useState([]);
   const [items, setItems] = useState([]);
@@ -449,26 +453,29 @@ function NewOrderDialog({ open, onClose, onSaved }) {
     setError('');
     setLastOrder(null);
     setForm({
-      customerId: '',
+      customerId: isCustomer ? user?.customerId || '' : '',
       salesRepresentativeId: '',
       orderDate: dayjs().format('YYYY-MM-DDTHH:mm'),
       currency: 'CZK',
       note: '',
       items: [{ itemId: '', quantity: 1 }],
     });
-    client
-      .get('/customers', { params: { page: 0, size: 1000, sort: 'name,asc' } })
-      .then((res) => setCustomers(res.data.content || []))
-      .catch(() => setCustomers([]));
-    client
-      .get('/users/sales-representatives')
-      .then((res) => setReps(res.data))
-      .catch(() => setReps([]));
+    // A customer must not (and cannot) pick another customer or a sales rep.
+    if (!isCustomer) {
+      client
+        .get('/customers', { params: { page: 0, size: 1000, sort: 'name,asc' } })
+        .then((res) => setCustomers(res.data.content || []))
+        .catch(() => setCustomers([]));
+      client
+        .get('/users/sales-representatives')
+        .then((res) => setReps(res.data))
+        .catch(() => setReps([]));
+    }
     client
       .get('/items')
       .then((res) => setItems(res.data))
       .catch(() => setItems([]));
-  }, [open]);
+  }, [open, isCustomer, user]);
 
   // After a customer is picked, look up their most recent order so its items
   // (including quantities) can be offered as a prefill.
@@ -523,8 +530,12 @@ function NewOrderDialog({ open, onClose, onSaved }) {
 
   const handleSave = async () => {
     const validItems = form.items.filter((i) => i.itemId && Number(i.quantity) > 0);
-    if (!form.customerId || !form.salesRepresentativeId || validItems.length === 0) {
-      setError('Vyplňte zákazníka, obchodního zástupce a alespoň jednu položku.');
+    if (!form.customerId || (!isCustomer && !form.salesRepresentativeId) || validItems.length === 0) {
+      setError(
+        isCustomer
+          ? 'Přidejte alespoň jednu položku objednávky.'
+          : 'Vyplňte zákazníka, obchodního zástupce a alespoň jednu položku.'
+      );
       return;
     }
     setSaving(true);
@@ -534,7 +545,8 @@ function NewOrderDialog({ open, onClose, onSaved }) {
         customerId: form.customerId,
         // Own company issuing the order; the backend falls back to the default company.
         companyId: activeCompany?.id || null,
-        salesRepresentativeId: form.salesRepresentativeId,
+        // A customer has no sales rep picker; the backend assigns one to the order.
+        salesRepresentativeId: form.salesRepresentativeId || null,
         orderDate: new Date(form.orderDate).toISOString(),
         currency: form.currency,
         note: form.note || null,
@@ -559,38 +571,44 @@ function NewOrderDialog({ open, onClose, onSaved }) {
           </Alert>
         )}
         <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              select
-              label="Zákazník"
-              value={form.customerId}
-              onChange={(e) => setForm((f) => ({ ...f, customerId: e.target.value }))}
-              required
-              fullWidth
-            >
-              {customers.map((c) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.name}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              select
-              label="Obchodní zástupce"
-              value={form.salesRepresentativeId}
-              onChange={(e) => setForm((f) => ({ ...f, salesRepresentativeId: e.target.value }))}
-              required
-              fullWidth
-            >
-              {reps.map((r) => (
-                <MenuItem key={r.id} value={r.id}>
-                  {r.firstName} {r.lastName}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
+          {!isCustomer && (
+            <>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  select
+                  label="Zákazník"
+                  value={form.customerId}
+                  onChange={(e) => setForm((f) => ({ ...f, customerId: e.target.value }))}
+                  required
+                  fullWidth
+                >
+                  {customers.map((c) => (
+                    <MenuItem key={c.id} value={c.id}>
+                      {c.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  select
+                  label="Obchodní zástupce"
+                  value={form.salesRepresentativeId}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, salesRepresentativeId: e.target.value }))
+                  }
+                  required
+                  fullWidth
+                >
+                  {reps.map((r) => (
+                    <MenuItem key={r.id} value={r.id}>
+                      {r.firstName} {r.lastName}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+            </>
+          )}
           <Grid item xs={12} sm={6}>
             <TextField
               label="Datum objednávky"

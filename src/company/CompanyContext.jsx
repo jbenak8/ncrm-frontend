@@ -5,23 +5,27 @@ import { useAuth } from '../auth/AuthContext';
 // Holds the list of own companies and the currently active one. Companies are
 // manageable only by the owner (administrator); sales representatives can also
 // list and select among the companies they are assigned to (the backend scopes
-// the list accordingly). Customers have no access to companies.
+// the list accordingly). Customers cannot switch companies, but the company
+// they are assigned to is loaded and preselected automatically so they can
+// create orders for it.
 const CompanyContext = createContext(null);
 
 const STORAGE_KEY = 'ncrm-active-company';
 
 export function CompanyProvider({ children }) {
-  const { isOwner, isSalesRep } = useAuth();
+  const { isOwner, isSalesRep, isCustomer } = useAuth();
   const companySelectionAvailable = isOwner || isSalesRep;
+  // Customers also load their (single) assigned company, they just cannot switch it.
+  const companiesAvailable = companySelectionAvailable || isCustomer;
   const [companies, setCompanies] = useState([]);
   const [activeCompanyId, setActiveCompanyId] = useState(
     () => sessionStorage.getItem(STORAGE_KEY) || null
   );
-  const [loading, setLoading] = useState(companySelectionAvailable);
+  const [loading, setLoading] = useState(companiesAvailable);
   const [error, setError] = useState('');
 
   const reload = useCallback(async () => {
-    if (!companySelectionAvailable) {
+    if (!companiesAvailable) {
       setLoading(false);
       return [];
     }
@@ -37,17 +41,20 @@ export function CompanyProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, [companySelectionAvailable]);
+  }, [companiesAvailable]);
 
   useEffect(() => {
     reload();
   }, [reload]);
 
   // Resolve the active company: explicit selection wins, then the default company.
+  // A customer is assigned to a single company by the backend, so it is
+  // preselected automatically even when not marked as default.
   useEffect(() => {
-    if (!companySelectionAvailable || loading) return;
+    if (!companiesAvailable || loading) return;
     if (activeCompanyId && companies.some((c) => c.id === activeCompanyId)) return;
-    const defaultCompany = companies.find((c) => c.defaultCompany);
+    const defaultCompany =
+      companies.find((c) => c.defaultCompany) || (isCustomer ? companies[0] : null);
     if (defaultCompany) {
       setActiveCompanyId(defaultCompany.id);
       sessionStorage.setItem(STORAGE_KEY, defaultCompany.id);
@@ -55,7 +62,7 @@ export function CompanyProvider({ children }) {
       setActiveCompanyId(null);
       sessionStorage.removeItem(STORAGE_KEY);
     }
-  }, [companySelectionAvailable, loading, companies, activeCompanyId]);
+  }, [companiesAvailable, isCustomer, loading, companies, activeCompanyId]);
 
   const selectCompany = useCallback((companyId) => {
     setActiveCompanyId(companyId);

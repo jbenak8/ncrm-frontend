@@ -144,6 +144,8 @@ export function AuthProvider({ children }) {
     const roles = user?.roles || [];
     const normalized = roles.map((r) => r.replace(/^ROLE_/, '').toUpperCase());
     const isAdmin = normalized.includes('ADMIN');
+    const isOwner = isAdmin || normalized.includes('OWNER');
+    const isSalesRep = normalized.includes('SALES_REPRESENTATIVE');
     return {
       authMode: AUTH_MODE,
       initializing,
@@ -151,8 +153,11 @@ export function AuthProvider({ children }) {
       isAuthenticated: !!user,
       // The administrator role has global access, i.e. everything the owner can do.
       isAdmin,
-      isOwner: isAdmin || normalized.includes('OWNER'),
-      isSalesRep: normalized.includes('SALES_REPRESENTATIVE'),
+      isOwner,
+      isSalesRep,
+      // A pure customer account (no owner/sales rep role) is tied to a single
+      // customer record and to the company it is assigned to.
+      isCustomer: !isOwner && !isSalesRep && normalized.includes('CUSTOMER'),
       // The user has to change their password before continuing.
       mustChangePassword: !!user && (user.mustChangePassword === true || user.credentialsExpired === true),
       roles: normalized,
