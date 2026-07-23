@@ -4,6 +4,8 @@ import client, { setAuthHeader, setUnauthorizedHandler } from '../api/client';
 
 // Auth mode is driven by env variables:
 //   VITE_AUTH_MODE=basic     -> username/password login against the backend "local" profile (HTTP Basic)
+//   VITE_AUTH_MODE=db        -> username/password login against the backend "db-auth" profile
+//                               (POST /api/auth/login, database-issued Bearer JWT)
 //   VITE_AUTH_MODE=keycloak  -> redirect login via Keycloak (backend "prod" profile, Bearer JWT)
 const AUTH_MODE = import.meta.env.VITE_AUTH_MODE || 'basic';
 
@@ -58,6 +60,7 @@ export function AuthProvider({ children }) {
     setAuthHeader(null);
     sessionStorage.removeItem('ncrm-basic-auth');
     sessionStorage.removeItem('ncrm-basic-user');
+    sessionStorage.removeItem('ncrm-db-token');
     setUser(null);
     if (AUTH_MODE === 'keycloak' && keycloak) {
       keycloak.logout({ redirectUri: window.location.origin });
@@ -78,6 +81,12 @@ export function AuthProvider({ children }) {
               kc.updateToken(30).then(() => setAuthHeader(`Bearer ${kc.token}`));
             await loadCurrentUser();
           }
+        } else if (AUTH_MODE === 'db') {
+          const token = sessionStorage.getItem('ncrm-db-token');
+          if (token) {
+            setAuthHeader(`Bearer ${token}`);
+            await loadCurrentUser();
+          }
         } else {
           const stored = sessionStorage.getItem('ncrm-basic-auth');
           if (stored) {
@@ -88,6 +97,7 @@ export function AuthProvider({ children }) {
       } catch (e) {
         setAuthHeader(null);
         sessionStorage.removeItem('ncrm-basic-auth');
+        sessionStorage.removeItem('ncrm-db-token');
       } finally {
         setInitializing(false);
       }
@@ -130,6 +140,25 @@ export function AuthProvider({ children }) {
     [loadCurrentUser]
   );
 
+  // Login against the backend "db-auth" profile: exchanges the credentials for a
+  // database-issued JWT access token via POST /api/auth/login. Disabled or locked
+  // accounts are rejected by the backend with HTTP 401.
+  const loginDb = useCallback(
+    async (username, password) => {
+      const { data } = await client.post('/auth/login', { username, password });
+      setAuthHeader(`${data.tokenType || 'Bearer'} ${data.accessToken}`);
+      try {
+        const me = await loadCurrentUser(username);
+        sessionStorage.setItem('ncrm-db-token', data.accessToken);
+        return me;
+      } catch (e) {
+        setAuthHeader(null);
+        throw e;
+      }
+    },
+    [loadCurrentUser]
+  );
+
   const loginKeycloak = useCallback(() => {
     getKeycloak().login({ redirectUri: window.location.origin });
   }, []);
@@ -162,11 +191,12 @@ export function AuthProvider({ children }) {
       mustChangePassword: !!user && (user.mustChangePassword === true || user.credentialsExpired === true),
       roles: normalized,
       loginBasic,
+      loginDb,
       loginKeycloak,
       refreshUser,
       logout,
     };
-  }, [user, initializing, loginBasic, loginKeycloak, refreshUser, logout]);
+  }, [user, initializing, loginBasic, loginDb, loginKeycloak, refreshUser, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

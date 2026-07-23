@@ -4,7 +4,7 @@ React based frontend for nCRM application (React 18 + Material UI 6 + Vite).
 
 ## Funkce
 
-- **Přihlašování** — HTTP Basic proti backend profilu `local` (uživatelé `owner` / `rep` / `customer`, heslo `test`), nebo **Keycloak** (JWT) pro profil `prod`. Při přihlášení se kontrolují flagy účtu (zakázaný, zamknutý, vypršelé heslo, vynucená změna hesla) — při vynucené změně hesla se zobrazí blokující dialog (původní heslo, nové heslo 2×) s politikou hesel (min. 8 znaků, velké i malé písmeno, číslice a speciální znak).
+- **Přihlašování** — tři volitelné režimy přepínané proměnnou `VITE_AUTH_MODE`: HTTP Basic proti backend profilu `local` (uživatelé `owner` / `rep` / `customer`, heslo `test`), **databázové přihlášení** (JWT) proti backend profilu `db-auth` — formulář jméno/heslo, token vydává backend přes `POST /api/auth/login`, nebo **Keycloak** (JWT) pro profil `prod`. Při přihlášení se kontrolují flagy účtu (zakázaný, zamknutý, vypršelé heslo, vynucená změna hesla) — při vynucené změně hesla se zobrazí blokující dialog (původní heslo, nové heslo 2×) s politikou hesel (min. 8 znaků, velké i malé písmeno, číslice a speciální znak).
 - **Dashboard dle role** — majitel (OWNER) vidí souhrn, grafy objednávek/tržeb, top zákazníky a výkon zástupců; obchodní zástupce vidí své schůzky a objednávky.
 - **Zákazníci** — stránkovaný seznam s vyhledáváním, detail (kontaktní osoby, provozovny, objednávky, schůzky), zakládání a editace s **doplněním dat z ARES** podle IČO.
 - **Objednávky** — seznam s rozbalitelnými položkami, vytváření, změny stavu (workflow NEW → CONFIRMED → IN_PROGRESS → COMPLETED / CANCELLED). U dokončených objednávek lze vystavit fakturu (platba hotově nebo převodem, volitelná splatnost a poznámka).
@@ -38,7 +38,7 @@ Viz `.env.example`:
 
 | Proměnná | Význam |
 |---|---|
-| `VITE_AUTH_MODE` | `basic` (výchozí, lokální profil backendu) nebo `keycloak` |
+| `VITE_AUTH_MODE` | `basic` (výchozí, lokální profil backendu), `db` (profil `db-auth`, přihlášení proti databázi aplikace) nebo `keycloak` (profil `prod`) |
 | `VITE_KEYCLOAK_URL` | URL Keycloak serveru |
 | `VITE_KEYCLOAK_REALM` | Keycloak realm |
 | `VITE_KEYCLOAK_CLIENT_ID` | Keycloak client id |

@@ -16,7 +16,7 @@ import Footer from '../components/Footer';
 import appLogo from '../assets/nCRM_logo2.png';
 
 export default function LoginPage() {
-  const { authMode, loginBasic, loginKeycloak } = useAuth();
+  const { authMode, loginBasic, loginDb, loginKeycloak } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -27,7 +27,10 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      await loginBasic(username.trim(), password);
+      // The "db" mode logs in against the backend database (db-auth profile),
+      // any other non-keycloak mode falls back to HTTP Basic (local profile).
+      const login = authMode === 'db' ? loginDb : loginBasic;
+      await login(username.trim(), password);
     } catch (err) {
       if (err.accountFlag === 'disabled') {
         setError('Váš účet je zakázán. Kontaktujte prosím administrátora.');
