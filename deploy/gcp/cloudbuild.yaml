@@ -1,0 +1,70 @@
+# Google Cloud Build: build the image, push it to Artifact Registry and deploy
+# to Cloud Run.
+#
+# One-time setup:
+#   gcloud artifacts repositories create ncrm --repository-format=docker --location=europe-west1
+#
+# Run from the repository root:
+#   gcloud builds submit --config deploy/gcp/cloudbuild.yaml \
+#     --substitutions _BACKEND_URL=https://ncrm-backend-xxxx.a.run.app
+#
+# Substitutions (override with --substitutions as needed):
+#   _REGION            - Artifact Registry / Cloud Run region
+#   _REPOSITORY        - Artifact Registry docker repository name
+#   _SERVICE           - Cloud Run service name
+#   _BACKEND_URL       - backend URL proxied by nginx (/api, /actuator)
+#   _VITE_AUTH_MODE    - auth mode baked into the bundle at build time
+#   _VITE_KEYCLOAK_*   - Keycloak settings (only for _VITE_AUTH_MODE=keycloak)
+substitutions:
+  _REGION: europe-west1
+  _REPOSITORY: ncrm
+  _SERVICE: ncrm-frontend
+  _BACKEND_URL: http://ncrm-backend:8080
+  _VITE_AUTH_MODE: db
+  _VITE_KEYCLOAK_URL: ''
+  _VITE_KEYCLOAK_REALM: ''
+  _VITE_KEYCLOAK_CLIENT_ID: ''
+
+steps:
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --build-arg
+      - VITE_AUTH_MODE=${_VITE_AUTH_MODE}
+      - --build-arg
+      - VITE_KEYCLOAK_URL=${_VITE_KEYCLOAK_URL}
+      - --build-arg
+      - VITE_KEYCLOAK_REALM=${_VITE_KEYCLOAK_REALM}
+      - --build-arg
+      - VITE_KEYCLOAK_CLIENT_ID=${_VITE_KEYCLOAK_CLIENT_ID}
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$SHORT_SHA
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:latest
+      - .
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}
+
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$SHORT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --port=8080
+      - --allow-unauthenticated
+      - --set-env-vars=BACKEND_URL=${_BACKEND_URL}
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$SHORT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:latest

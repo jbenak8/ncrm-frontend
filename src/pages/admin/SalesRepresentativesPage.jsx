@@ -8,7 +8,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Grid,
   IconButton,
   LinearProgress,
   MenuItem,
@@ -24,6 +23,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import ToggleOnIcon from '@mui/icons-material/ToggleOn';
@@ -231,10 +231,10 @@ export default function SalesRepresentativesPage() {
             </Alert>
           )}
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <TextField label="Kód" value={form.code} onChange={set('code')} required fullWidth />
             </Grid>
-            <Grid item xs={12} sm={8}>
+            <Grid size={{ xs: 12, sm: 8 }}>
               <TextField
                 select
                 label="Uživatelský účet"
@@ -250,7 +250,7 @@ export default function SalesRepresentativesPage() {
                 ))}
               </TextField>
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Firemní e-mail"
                 value={form.businessEmail}
@@ -258,13 +258,13 @@ export default function SalesRepresentativesPage() {
                 fullWidth
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField label="Telefon" value={form.phone} onChange={set('phone')} fullWidth />
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <TextField label="Region" value={form.region} onChange={set('region')} fullWidth />
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <TextField
                 label="Poznámka"
                 value={form.note}

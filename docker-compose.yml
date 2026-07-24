@@ -1,0 +1,20 @@
+# Local/production run of the frontend in Docker.
+# The backend is expected to run on the host (http://localhost:8080) by default;
+# override BACKEND_URL when the backend runs as another container/service.
+services:
+  ncrm-frontend:
+    build:
+      context: .
+      args:
+        VITE_AUTH_MODE: ${VITE_AUTH_MODE:-db}
+        VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL:-}
+        VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM:-}
+        VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID:-}
+    image: ncrm-frontend:local
+    ports:
+      - "3000:8080"
+    environment:
+      BACKEND_URL: ${BACKEND_URL:-http://host.docker.internal:8080}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

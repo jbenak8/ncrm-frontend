@@ -11,13 +11,13 @@ import {
   DialogTitle,
   Divider,
   FormControlLabel,
-  Grid,
   InputAdornment,
   Switch,
   TextField,
   Tooltip,
   Typography,
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -25,6 +25,8 @@ import client from '../api/client';
 
 const ALLOWED_LOGO_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml'];
 const MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024;
+const ALLOWED_STAMP_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml'];
+const MAX_STAMP_SIZE_BYTES = 2 * 1024 * 1024;
 
 const emptyAddress = {
   street: '',
@@ -58,8 +60,8 @@ const emptyForm = {
 /**
  * Create / edit own company dialog with ARES lookup: after entering the registration id (IČO)
  * the "ARES" button fills in name, VAT id and address (including the orientation number) from
- * the registry. The logo can be uploaded (PNG/JPEG/GIF/WebP/SVG, max 2 MB) or removed; the file
- * is sent to the logo endpoint after the company itself is saved.
+ * the registry. The logo and the stamp can be uploaded (PNG/JPEG/GIF/WebP/SVG, max 2 MB) or
+ * removed; the files are sent to their endpoints after the company itself is saved.
  */
 export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
   const [form, setForm] = useState(emptyForm);
@@ -71,13 +73,16 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState('');
   const [logoRemoved, setLogoRemoved] = useState(false);
+  const [stampFile, setStampFile] = useState(null);
+  const [stampPreview, setStampPreview] = useState('');
+  const [stampRemoved, setStampRemoved] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     client
       .get('/countries')
       .then((res) => setCountries(res.data))
-      .catch(() => {});
+      .catch(() => setCountries([]));
   }, [open]);
 
   useEffect(() => {
@@ -90,7 +95,7 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
         nameSecondLine: company.nameSecondLine || '',
         registrationId: company.registrationId || '',
         vatId: company.vatId || '',
-        address: { ...emptyAddress, ...(company.address || {}) },
+        address: { ...emptyAddress, ...company.address },
         registrationNote: company.registrationNote || '',
         registrationNoteEn: company.registrationNoteEn || '',
         phone: company.phone || '',
@@ -113,7 +118,7 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
     setLogoFile(null);
     setLogoRemoved(false);
     setLogoPreview('');
-    if (!company || !company.hasLogo) return;
+    if (!company?.hasLogo) return;
     let url = '';
     client
       .get(`/companies/${company.id}/logo`, { responseType: 'blob' })
@@ -121,7 +126,26 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
         url = URL.createObjectURL(res.data);
         setLogoPreview(url);
       })
-      .catch(() => {});
+      .catch(() => setLogoPreview(''));
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [open, company]);
+
+  useEffect(() => {
+    if (!open) return;
+    setStampFile(null);
+    setStampRemoved(false);
+    setStampPreview('');
+    if (!company?.hasStamp) return;
+    let url = '';
+    client
+      .get(`/companies/${company.id}/stamp`, { responseType: 'blob' })
+      .then((res) => {
+        url = URL.createObjectURL(res.data);
+        setStampPreview(url);
+      })
+      .catch(() => setStampPreview(''));
     return () => {
       if (url) URL.revokeObjectURL(url);
     };
@@ -149,11 +173,10 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
         registrationId: data.registrationId || f.registrationId,
         address: data.address ? { ...emptyAddress, ...data.address } : f.address,
       }));
-      setAresInfo(
-        `Data načtena z ARES${data.legalForm ? ` (právní forma: ${data.legalForm})` : ''}.`
-      );
+      const legalFormInfo = data.legalForm ? ` (právní forma: ${data.legalForm})` : '';
+      setAresInfo(`Data načtena z ARES${legalFormInfo}.`);
     } catch (e) {
-      if (e.response && e.response.status === 404) {
+      if (e.response?.status === 404) {
         setError(`Subjekt s IČO ${regId} nebyl v ARES nalezen.`);
       } else {
         setError('Vyhledání v ARES se nezdařilo.');
@@ -187,6 +210,30 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
     setLogoRemoved(true);
   };
 
+  const handleStampSelect = (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!ALLOWED_STAMP_TYPES.includes(file.type)) {
+      setError('Razítko musí být obrázek PNG, JPEG, GIF, WebP nebo SVG.');
+      return;
+    }
+    if (file.size > MAX_STAMP_SIZE_BYTES) {
+      setError('Razítko může mít maximálně 2 MB.');
+      return;
+    }
+    setError('');
+    setStampFile(file);
+    setStampRemoved(false);
+    setStampPreview(URL.createObjectURL(file));
+  };
+
+  const handleStampRemove = () => {
+    setStampFile(null);
+    setStampPreview('');
+    setStampRemoved(true);
+  };
+
   const handleSave = async () => {
     if (!form.name.trim() || !form.registrationId.trim()) {
       setError('Název a IČO jsou povinné.');
@@ -205,12 +252,28 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
           ({ data } = await client.put(`/companies/${data.id}/logo`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
           }));
-        } else if (logoRemoved && company && company.hasLogo) {
+        } else if (logoRemoved && company?.hasLogo) {
           await client.delete(`/companies/${data.id}/logo`);
           data = { ...data, hasLogo: false };
         }
       } catch (e) {
         setError('Společnost byla uložena, ale změna loga se nezdařila.');
+        onSaved(data);
+        return;
+      }
+      try {
+        if (stampFile) {
+          const formData = new FormData();
+          formData.append('file', stampFile);
+          ({ data } = await client.put(`/companies/${data.id}/stamp`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          }));
+        } else if (stampRemoved && company?.hasStamp) {
+          await client.delete(`/companies/${data.id}/stamp`);
+          data = { ...data, hasStamp: false };
+        }
+      } catch (e) {
+        setError('Společnost byla uložena, ale změna razítka se nezdařila.');
         onSaved(data);
         return;
       }
@@ -238,14 +301,14 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
           </Alert>
         )}
         <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               label="IČO"
               value={form.registrationId}
               onChange={set('registrationId')}
               required
               fullWidth
-              InputProps={{
+              slotProps={{ input: {
                 endAdornment: (
                   <InputAdornment position="end">
                     <Tooltip title="Doplnit údaje z registru ARES">
@@ -268,16 +331,16 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
                     </Tooltip>
                   </InputAdornment>
                 ),
-              }}
+              } }}
             />
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField label="DIČ" value={form.vatId} onChange={set('vatId')} fullWidth />
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField label="Název" value={form.name} onChange={set('name')} required fullWidth />
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               label="Název — druhý řádek"
               value={form.nameSecondLine}
@@ -285,24 +348,24 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
               fullWidth
             />
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField label="E-mail" value={form.email} onChange={set('email')} fullWidth />
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField label="Telefon" value={form.phone} onChange={set('phone')} fullWidth />
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField label="Web" value={form.website} onChange={set('website')} fullWidth />
           </Grid>
 
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Divider>
               <Typography variant="caption" color="text.secondary">
                 Adresa sídla
               </Typography>
             </Divider>
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               label="Ulice"
               value={form.address.street}
@@ -310,7 +373,7 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
               fullWidth
             />
           </Grid>
-          <Grid item xs={12} sm={3}>
+          <Grid size={{ xs: 12, sm: 3 }}>
             <TextField
               label="Číslo popisné"
               value={form.address.houseNumber}
@@ -318,7 +381,7 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
               fullWidth
             />
           </Grid>
-          <Grid item xs={12} sm={3}>
+          <Grid size={{ xs: 12, sm: 3 }}>
             <TextField
               label="Číslo orientační"
               value={form.address.streetNumber}
@@ -326,7 +389,7 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
               fullWidth
             />
           </Grid>
-          <Grid item xs={12} sm={5}>
+          <Grid size={{ xs: 12, sm: 5 }}>
             <TextField
               label="Město"
               value={form.address.city}
@@ -334,7 +397,7 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
               fullWidth
             />
           </Grid>
-          <Grid item xs={12} sm={3}>
+          <Grid size={{ xs: 12, sm: 3 }}>
             <TextField
               label="PSČ"
               value={form.address.zipCode}
@@ -342,7 +405,7 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
               fullWidth
             />
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <Autocomplete
               options={countries}
               getOptionLabel={(c) => `${c.isoCode} — ${c.name}`}
@@ -367,14 +430,14 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
             />
           </Grid>
 
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Divider>
               <Typography variant="caption" color="text.secondary">
                 Bankovní spojení
               </Typography>
             </Divider>
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               label="Číslo účtu"
               value={form.bankAccount}
@@ -382,7 +445,7 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
               fullWidth
             />
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               label="Banka"
               value={form.bankName}
@@ -390,21 +453,21 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
               fullWidth
             />
           </Grid>
-          <Grid item xs={12} sm={8}>
+          <Grid size={{ xs: 12, sm: 8 }}>
             <TextField label="IBAN" value={form.iban} onChange={set('iban')} fullWidth />
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField label="BIC / SWIFT" value={form.bic} onChange={set('bic')} fullWidth />
           </Grid>
 
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Divider>
               <Typography variant="caption" color="text.secondary">
                 Registrační doložka
               </Typography>
             </Divider>
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               label="Doložka (CZ)"
               value={form.registrationNote}
@@ -414,7 +477,7 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
               minRows={2}
             />
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               label="Doložka (EN)"
               value={form.registrationNoteEn}
@@ -425,14 +488,14 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
             />
           </Grid>
 
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Divider>
               <Typography variant="caption" color="text.secondary">
                 Logo
               </Typography>
             </Divider>
           </Grid>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               {logoPreview ? (
                 <Box
@@ -455,7 +518,7 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
                 </Typography>
               )}
               <Button component="label" size="small" startIcon={<UploadFileIcon />}>
-                Nahrát logo
+                {'Nahrát logo'}
                 <input
                   type="file"
                   hidden
@@ -479,7 +542,61 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
             </Box>
           </Grid>
 
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12 }}>
+            <Divider>
+              <Typography variant="caption" color="text.secondary">
+                Razítko
+              </Typography>
+            </Divider>
+          </Grid>
+          <Grid size={{ xs: 12 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              {stampPreview ? (
+                <Box
+                  component="img"
+                  src={stampPreview}
+                  alt="Razítko společnosti"
+                  sx={{
+                    maxHeight: 64,
+                    maxWidth: 160,
+                    objectFit: 'contain',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 1,
+                    p: 0.5,
+                  }}
+                />
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  Žádné razítko
+                </Typography>
+              )}
+              <Button component="label" size="small" startIcon={<UploadFileIcon />}>
+                {'Nahrát razítko'}
+                <input
+                  type="file"
+                  hidden
+                  accept={ALLOWED_STAMP_TYPES.join(',')}
+                  onChange={handleStampSelect}
+                />
+              </Button>
+              {stampPreview && (
+                <Button
+                  size="small"
+                  color="error"
+                  startIcon={<DeleteOutlineIcon />}
+                  onClick={handleStampRemove}
+                >
+                  Odebrat
+                </Button>
+              )}
+              <Typography variant="caption" color="text.secondary">
+                PNG, JPEG, GIF, WebP nebo SVG, max. 2 MB
+              </Typography>
+            </Box>
+          </Grid>
+
+          <Grid size={{ xs: 12, sm: 6 }}>
             <FormControlLabel
               control={
                 <Switch
@@ -490,7 +607,7 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
               label="Aktivní"
             />
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <FormControlLabel
               control={
                 <Switch

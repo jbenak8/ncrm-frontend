@@ -8,7 +8,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Grid,
   IconButton,
   LinearProgress,
   MenuItem,
@@ -24,6 +23,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -238,7 +238,7 @@ export default function VatRatesPage() {
             </Alert>
           )}
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 select
                 label="Země"
@@ -257,7 +257,7 @@ export default function VatRatesPage() {
                 )}
               </TextField>
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField select label="Typ" value={form.type} onChange={set('type')} required fullWidth>
                 {Object.entries(VAT_TYPE_LABELS).map(([value, label]) => (
                   <MenuItem key={value} value={value}>
@@ -266,7 +266,7 @@ export default function VatRatesPage() {
                 ))}
               </TextField>
             </Grid>
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <TextField
                 label="Sazba (%)"
                 type="number"
@@ -276,7 +276,7 @@ export default function VatRatesPage() {
                 fullWidth
               />
             </Grid>
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <TextField
                 label="Platnost od"
                 type="date"
@@ -284,17 +284,17 @@ export default function VatRatesPage() {
                 onChange={set('validFrom')}
                 required
                 fullWidth
-                InputLabelProps={{ shrink: true }}
+                slotProps={{ inputLabel: { shrink: true } }}
               />
             </Grid>
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <TextField
                 label="Platnost do"
                 type="date"
                 value={form.validTo}
                 onChange={set('validTo')}
                 fullWidth
-                InputLabelProps={{ shrink: true }}
+                slotProps={{ inputLabel: { shrink: true } }}
               />
             </Grid>
           </Grid>

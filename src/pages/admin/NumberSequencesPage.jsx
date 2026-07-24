@@ -10,7 +10,6 @@ import {
   DialogContent,
   DialogTitle,
   FormControlLabel,
-  Grid,
   IconButton,
   LinearProgress,
   MenuItem,
@@ -26,6 +25,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -99,7 +99,8 @@ export default function NumberSequencesPage() {
       Math.min(12, Math.max(1, Number(form.padding) || 1)),
       '0'
     );
-    return `${form.prefix || ''}${year ? `${year}-` : ''}${counter}`;
+    const yearPart = year ? `${year}-` : '';
+    return `${form.prefix || ''}${yearPart}${counter}`;
   };
 
   const handleSave = async () => {
@@ -238,7 +239,7 @@ export default function NumberSequencesPage() {
             </Alert>
           )}
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 select
                 label="Typ dokladu"
@@ -255,17 +256,17 @@ export default function NumberSequencesPage() {
                 ))}
               </TextField>
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Prefix"
                 value={form.prefix}
                 onChange={set('prefix')}
                 fullWidth
-                inputProps={{ maxLength: 20 }}
+                slotProps={{ htmlInput: { maxLength: 20 } }}
                 helperText="Např. OBJ- nebo FA-"
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Počet číslic"
                 type="number"
@@ -273,10 +274,10 @@ export default function NumberSequencesPage() {
                 onChange={set('padding')}
                 required
                 fullWidth
-                inputProps={{ min: 1, max: 12 }}
+                slotProps={{ htmlInput: { min: 1, max: 12 } }}
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Další hodnota"
                 type="number"
@@ -284,31 +285,31 @@ export default function NumberSequencesPage() {
                 onChange={set('nextValue')}
                 required
                 fullWidth
-                inputProps={{ min: 1 }}
+                slotProps={{ htmlInput: { min: 1 } }}
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <FormControlLabel
                 control={<Checkbox checked={form.includeYear} onChange={setChecked('includeYear')} />}
                 label="Zahrnout rok do čísla"
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <FormControlLabel
                 control={<Checkbox checked={form.yearlyReset} onChange={setChecked('yearlyReset')} />}
                 label="Resetovat čítač na začátku roku"
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <TextField
                 label="Popis"
                 value={form.description}
                 onChange={set('description')}
                 fullWidth
-                inputProps={{ maxLength: 255 }}
+                slotProps={{ htmlInput: { maxLength: 255 } }}
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <Alert severity="info">
                 Příští vygenerované číslo: <strong>{preview()}</strong>
               </Alert>

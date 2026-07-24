@@ -37,9 +37,9 @@ function conversationToText(messages, providerLabel) {
 
 function escapeHtml(text) {
   return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;');
 }
 
 /**
@@ -68,11 +68,11 @@ export default function AiChatPage() {
     setError('');
     setInput('');
     const history = messages;
-    setMessages((m) => [...m, { role: 'user', content: message }]);
+    setMessages((m) => [...m, { id: crypto.randomUUID(), role: 'user', content: message }]);
     setLoading(true);
     try {
       const { data } = await client.post('/ai/chat', { message, history, provider });
-      setMessages((m) => [...m, { role: 'assistant', content: data.content || '' }]);
+      setMessages((m) => [...m, { id: crypto.randomUUID(), role: 'assistant', content: data.content || '' }]);
     } catch {
       setError('Komunikace s AI chatbotem se nezdařila.');
     } finally {
@@ -97,20 +97,15 @@ export default function AiChatPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `ai-chat-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.txt`;
+    link.download = `ai-chat-${new Date().toISOString().slice(0, 19).replaceAll(/[:T]/g, '-')}.txt`;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
     URL.revokeObjectURL(url);
     setSnack('Konverzace byla exportována.');
   };
 
   const handlePrint = () => {
-    const win = window.open('', '_blank');
-    if (!win) {
-      setError('Nepodařilo se otevřít okno pro tisk.');
-      return;
-    }
     const body = messages
       .map(
         (m) => `
@@ -120,7 +115,7 @@ export default function AiChatPage() {
         </div>`
       )
       .join('');
-    win.document.write(`<!DOCTYPE html>
+    const html = `<!DOCTYPE html>
       <html lang="cs">
       <head>
         <meta charset="utf-8" />
@@ -138,10 +133,20 @@ export default function AiChatPage() {
         <h1>AI chat — ${escapeHtml(providerLabel)}</h1>
         ${body}
       </body>
-      </html>`);
-    win.document.close();
-    win.focus();
-    win.print();
+      </html>`;
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, '_blank');
+    if (!win) {
+      URL.revokeObjectURL(url);
+      setError('Nepodařilo se otevřít okno pro tisk.');
+      return;
+    }
+    win.addEventListener('load', () => {
+      win.focus();
+      win.print();
+      URL.revokeObjectURL(url);
+    });
   };
 
   return (
@@ -209,9 +214,9 @@ export default function AiChatPage() {
           </Typography>
         )}
         <Stack spacing={1.5}>
-          {messages.map((m, i) => (
+          {messages.map((m) => (
             <Stack
-              key={i}
+              key={m.id}
               direction="row"
               spacing={1}
               justifyContent={m.role === 'user' ? 'flex-end' : 'flex-start'}

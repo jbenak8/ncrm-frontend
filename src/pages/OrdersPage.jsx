@@ -3,13 +3,14 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Chip,
   Collapse,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  Grid,
+  FormControlLabel,
   IconButton,
   LinearProgress,
   MenuItem,
@@ -26,16 +27,19 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import SearchIcon from '@mui/icons-material/Search';
 import PrintIcon from '@mui/icons-material/Print';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import dayjs from 'dayjs';
 import client from '../api/client';
+import { useAuth } from '../auth/AuthContext';
 import { useCompany } from '../company/CompanyContext';
 import ItemPickerDialog from '../components/ItemPickerDialog';
 import SearchFilterBar from '../components/SearchFilterBar';
@@ -65,7 +69,7 @@ const SEARCH_FIELDS = [
 ];
 
 // Order items may be modified only while the order is new or confirmed.
-const EDITABLE_STATUSES = ['NEW', 'CONFIRMED'];
+const EDITABLE_STATUSES = new Set(['NEW', 'CONFIRMED']);
 
 const NEXT_STATUSES = {
   NEW: ['CONFIRMED', 'CANCELLED'],
@@ -75,7 +79,7 @@ const NEXT_STATUSES = {
   CANCELLED: [],
 };
 
-function OrderRow({ order, onStatusChange, onEditItems, onPrint, onIssueInvoice }) {
+function OrderRow({ order, onStatusChange, onEditItems, onPrint, onIssueInvoice, onAssignRep, readOnly }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -99,24 +103,34 @@ function OrderRow({ order, onStatusChange, onEditItems, onPrint, onIssueInvoice 
           />
         </TableCell>
         <TableCell align="right">
-          {(NEXT_STATUSES[order.status] || []).map((s) => (
-            <Button
-              key={s}
-              size="small"
-              color={s === 'CANCELLED' ? 'error' : 'primary'}
-              onClick={() => onStatusChange(order, s)}
-            >
-              {ORDER_STATUS_LABELS[s]}
-            </Button>
-          ))}
-          {EDITABLE_STATUSES.includes(order.status) && (
+          {/* Zákazník objednávky pouze prohlíží a tiskne; stavy, položky a fakturaci
+              spravuje vlastník / obchodní zástupce. */}
+          {!readOnly &&
+            (NEXT_STATUSES[order.status] || []).map((s) => (
+              <Button
+                key={s}
+                size="small"
+                color={s === 'CANCELLED' ? 'error' : 'primary'}
+                onClick={() => onStatusChange(order, s)}
+              >
+                {ORDER_STATUS_LABELS[s]}
+              </Button>
+            ))}
+          {!readOnly && EDITABLE_STATUSES.has(order.status) && (
             <Tooltip title="Upravit položky objednávky">
               <IconButton size="small" onClick={() => onEditItems(order)}>
                 <EditIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           )}
-          {order.status === 'COMPLETED' && (
+          {!readOnly && !order.salesRepresentativeId && (
+            <Tooltip title="Přiřadit obchodního zástupce">
+              <IconButton size="small" color="primary" onClick={() => onAssignRep(order)}>
+                <PersonAddIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+          {!readOnly && order.status === 'COMPLETED' && (
             <Tooltip title="Vystavit fakturu">
               <IconButton size="small" color="primary" onClick={() => onIssueInvoice(order)}>
                 <ReceiptLongIcon fontSize="small" />
@@ -172,6 +186,24 @@ function OrderRow({ order, onStatusChange, onEditItems, onPrint, onIssueInvoice 
   );
 }
 
+// Editable item row with a stable identity for React keys.
+const newRow = (itemId = '', quantity = 1) => ({ rowId: crypto.randomUUID(), itemId, quantity });
+
+// Merges the picked items into the item list without duplicates.
+const mergeItems = (list, picked) =>
+  [...list, ...picked.filter((p) => !list.some((i) => i.id === p.id))];
+
+// Appends the picked items as new rows; already present items are skipped
+// and blank rows are dropped.
+const appendPickedRows = (rows, picked) => {
+  const kept = rows.filter((r) => r.itemId);
+  const added = picked
+    .filter((p) => !kept.some((r) => r.itemId === p.id))
+    .map((p) => newRow(p.id, 1));
+  const next = [...kept, ...added];
+  return next.length > 0 ? next : [newRow()];
+};
+
 /**
  * Dialog for editing the items of an existing order. It is available only for
  * orders in the NEW or CONFIRMED status; the whole order (with the updated item
@@ -179,7 +211,7 @@ function OrderRow({ order, onStatusChange, onEditItems, onPrint, onIssueInvoice 
  */
 function EditOrderItemsDialog({ order, onClose, onSaved }) {
   const [items, setItems] = useState([]);
-  const [rows, setRows] = useState([{ itemId: '', quantity: 1 }]);
+  const [rows, setRows] = useState([newRow()]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -189,8 +221,8 @@ function EditOrderItemsDialog({ order, onClose, onSaved }) {
     setError('');
     setRows(
       (order.items || []).length > 0
-        ? order.items.map((i) => ({ itemId: i.itemId || '', quantity: i.quantity }))
-        : [{ itemId: '', quantity: 1 }]
+        ? order.items.map((i) => newRow(i.itemId || '', i.quantity))
+        : [newRow()]
     );
     client
       .get('/items')
@@ -198,21 +230,14 @@ function EditOrderItemsDialog({ order, onClose, onSaved }) {
       .catch(() => setItems([]));
   }, [order]);
 
-  const setRow = (idx, field, value) =>
-    setRows((rs) => rs.map((row, i) => (i === idx ? { ...row, [field]: value } : row)));
+  const setRow = (rowId, field, value) =>
+    setRows((rs) => rs.map((row) => (row.rowId === rowId ? { ...row, [field]: value } : row)));
 
-  // Adds the items picked in the search dialog as new rows; already present
-  // items are skipped and blank rows are dropped.
+  const removeRow = (rowId) => setRows((rs) => rs.filter((r) => r.rowId !== rowId));
+
   const handlePicked = (picked) => {
-    setItems((list) => [...list, ...picked.filter((p) => !list.some((i) => i.id === p.id))]);
-    setRows((rs) => {
-      const kept = rs.filter((r) => r.itemId);
-      const added = picked
-        .filter((p) => !kept.some((r) => r.itemId === p.id))
-        .map((p) => ({ itemId: p.id, quantity: 1 }));
-      const next = [...kept, ...added];
-      return next.length > 0 ? next : [{ itemId: '', quantity: 1 }];
-    });
+    setItems((list) => mergeItems(list, picked));
+    setRows((rs) => appendPickedRows(rs, picked));
   };
 
   const handleSave = async () => {
@@ -255,14 +280,14 @@ function EditOrderItemsDialog({ order, onClose, onSaved }) {
           </Alert>
         )}
         <Grid container spacing={2}>
-          {rows.map((row, idx) => (
-            <Grid item xs={12} key={idx}>
+          {rows.map((row) => (
+            <Grid size={{ xs: 12 }} key={row.rowId}>
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                 <TextField
                   select
                   label="Položka"
                   value={row.itemId}
-                  onChange={(e) => setRow(idx, 'itemId', e.target.value)}
+                  onChange={(e) => setRow(row.rowId, 'itemId', e.target.value)}
                   sx={{ flexGrow: 1 }}
                   size="small"
                 >
@@ -280,12 +305,12 @@ function EditOrderItemsDialog({ order, onClose, onSaved }) {
                   type="number"
                   size="small"
                   value={row.quantity}
-                  onChange={(e) => setRow(idx, 'quantity', e.target.value)}
-                  inputProps={{ min: 1 }}
+                  onChange={(e) => setRow(row.rowId, 'quantity', e.target.value)}
+                  slotProps={{ htmlInput: { min: 1 } }}
                   sx={{ width: 120 }}
                 />
                 <IconButton
-                  onClick={() => setRows((rs) => rs.filter((_, i) => i !== idx))}
+                  onClick={() => removeRow(row.rowId)}
                   disabled={rows.length === 1}
                 >
                   <DeleteIcon />
@@ -293,7 +318,7 @@ function EditOrderItemsDialog({ order, onClose, onSaved }) {
               </Box>
             </Grid>
           ))}
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Button
               size="small"
               startIcon={<AddIcon />}
@@ -323,19 +348,117 @@ function EditOrderItemsDialog({ order, onClose, onSaved }) {
 }
 
 /**
+ * Dialog for assigning a sales representative to an order that has none yet.
+ * Vlastník / administrátor může vybrat libovolného obchodního zástupce,
+ * obchodní zástupce může přiřadit pouze sám sebe. The backend accepts only a
+ * full order update, so the unchanged order fields are sent along with the
+ * chosen sales representative to `PUT /orders/{id}`.
+ */
+function AssignRepDialog({ order, onClose, onSaved }) {
+  const { user, isOwner } = useAuth();
+  const [reps, setReps] = useState([]);
+  const [repId, setRepId] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!order) return;
+    setError('');
+    if (isOwner) {
+      setRepId('');
+      client
+        .get('/users/sales-representatives')
+        .then((res) => setReps(res.data))
+        .catch(() => setReps([]));
+    } else {
+      // Obchodní zástupce může přiřadit pouze sám sebe.
+      setReps(user ? [user] : []);
+      setRepId(user?.id || '');
+    }
+  }, [order, isOwner, user]);
+
+  const handleAssign = async () => {
+    if (!repId) {
+      setError('Vyberte obchodního zástupce.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      // The backend accepts only a full order update, so the unchanged header
+      // fields are sent along with the assigned sales representative.
+      const { data } = await client.put(`/orders/${order.id}`, {
+        customerId: order.customerId,
+        companyId: order.companyId || null,
+        contactPersonId: order.contactPersonId || null,
+        salesRepresentativeId: repId,
+        orderDate: order.orderDate,
+        currency: order.currency,
+        note: order.note || null,
+        items: (order.items || [])
+          .filter((i) => i.itemId)
+          .map((i) => ({ itemId: i.itemId, quantity: i.quantity })),
+      });
+      onSaved(data);
+      onClose();
+    } catch {
+      setError('Přiřazení obchodního zástupce se nezdařilo.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={!!order} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>Přiřadit obchodního zástupce k objednávce {order?.orderNumber}</DialogTitle>
+      <DialogContent dividers>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+        <TextField
+          select
+          label="Obchodní zástupce"
+          value={repId}
+          onChange={(e) => setRepId(e.target.value)}
+          required
+          fullWidth
+          disabled={!isOwner}
+          helperText={!isOwner ? 'Jako obchodní zástupce můžete přiřadit pouze sám sebe.' : undefined}
+          sx={{ mt: 1 }}
+        >
+          {reps.map((r) => (
+            <MenuItem key={r.id} value={r.id}>
+              {r.firstName} {r.lastName}
+            </MenuItem>
+          ))}
+        </TextField>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Zrušit</Button>
+        <Button variant="contained" onClick={handleAssign} disabled={saving}>
+          {saving ? 'Přiřazuji…' : 'Přiřadit'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+/**
  * Dialog for issuing an invoice for a completed order. The payment type determines
  * the layout of the printed invoice (a bank transfer invoice carries the bank
  * account, variable symbol and a payment QR code); the request is sent to
  * `POST /invoices`.
  */
 function IssueInvoiceDialog({ order, onClose, onIssued }) {
-  const [form, setForm] = useState({ paymentType: 'TRANSFER', dueDays: 14, note: '' });
+  const [form, setForm] = useState({ paymentType: 'TRANSFER', dueDays: '14', note: '' });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!order) return;
-    setForm({ paymentType: 'TRANSFER', dueDays: 14, note: '' });
+    setForm({ paymentType: 'TRANSFER', dueDays: '14', note: '' });
     setError('');
   }, [order]);
 
@@ -375,7 +498,7 @@ function IssueInvoiceDialog({ order, onClose, onIssued }) {
           </Alert>
         )}
         <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               select
               label="Způsob platby"
@@ -391,18 +514,18 @@ function IssueInvoiceDialog({ order, onClose, onIssued }) {
               ))}
             </TextField>
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               label="Splatnost (dny)"
               type="number"
               value={form.dueDays}
               onChange={(e) => setForm((f) => ({ ...f, dueDays: e.target.value }))}
               fullWidth
-              inputProps={{ min: 0, max: 365 }}
+              slotProps={{ htmlInput: { min: 0, max: 365 } }}
               helperText="Prázdné = výchozích 14 dnů"
             />
           </Grid>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <TextField
               label="Poznámka na faktuře"
               value={form.note}
@@ -410,7 +533,7 @@ function IssueInvoiceDialog({ order, onClose, onIssued }) {
               fullWidth
               multiline
               minRows={2}
-              inputProps={{ maxLength: 255 }}
+              slotProps={{ htmlInput: { maxLength: 255 } }}
             />
           </Grid>
         </Grid>
@@ -427,6 +550,9 @@ function IssueInvoiceDialog({ order, onClose, onIssued }) {
 
 function NewOrderDialog({ open, onClose, onSaved }) {
   const { activeCompany } = useCompany() || {};
+  // A customer orders under their own customer record for the preselected
+  // company, so the customer and sales rep pickers are hidden for them.
+  const { user, isCustomer } = useAuth();
   const [customers, setCustomers] = useState([]);
   const [reps, setReps] = useState([]);
   const [items, setItems] = useState([]);
@@ -436,7 +562,7 @@ function NewOrderDialog({ open, onClose, onSaved }) {
     orderDate: dayjs().format('YYYY-MM-DDTHH:mm'),
     currency: 'CZK',
     note: '',
-    items: [{ itemId: '', quantity: 1 }],
+    items: [newRow()],
   });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -449,26 +575,29 @@ function NewOrderDialog({ open, onClose, onSaved }) {
     setError('');
     setLastOrder(null);
     setForm({
-      customerId: '',
+      customerId: isCustomer ? user?.customerId || '' : '',
       salesRepresentativeId: '',
       orderDate: dayjs().format('YYYY-MM-DDTHH:mm'),
       currency: 'CZK',
       note: '',
-      items: [{ itemId: '', quantity: 1 }],
+      items: [newRow()],
     });
-    client
-      .get('/customers', { params: { page: 0, size: 1000, sort: 'name,asc' } })
-      .then((res) => setCustomers(res.data.content || []))
-      .catch(() => setCustomers([]));
-    client
-      .get('/users/sales-representatives')
-      .then((res) => setReps(res.data))
-      .catch(() => setReps([]));
+    // A customer must not (and cannot) pick another customer or a sales rep.
+    if (!isCustomer) {
+      client
+        .get('/customers', { params: { page: 0, size: 1000, sort: 'name,asc' } })
+        .then((res) => setCustomers(res.data.content || []))
+        .catch(() => setCustomers([]));
+      client
+        .get('/users/sales-representatives')
+        .then((res) => setReps(res.data))
+        .catch(() => setReps([]));
+    }
     client
       .get('/items')
       .then((res) => setItems(res.data))
       .catch(() => setItems([]));
-  }, [open]);
+  }, [open, isCustomer, user]);
 
   // After a customer is picked, look up their most recent order so its items
   // (including quantities) can be offered as a prefill.
@@ -494,37 +623,35 @@ function NewOrderDialog({ open, onClose, onSaved }) {
     if (!lastOrder) return;
     const rows = (lastOrder.items || [])
       .filter((i) => i.itemId)
-      .map((i) => ({ itemId: i.itemId, quantity: i.quantity }));
+      .map((i) => newRow(i.itemId, i.quantity));
     if (rows.length > 0) {
       setForm((f) => ({ ...f, items: rows }));
     }
     setLastOrder(null);
   };
 
-  const setItemRow = (idx, field, value) =>
+  const setItemRow = (rowId, field, value) =>
     setForm((f) => ({
       ...f,
-      items: f.items.map((row, i) => (i === idx ? { ...row, [field]: value } : row)),
+      items: f.items.map((row) => (row.rowId === rowId ? { ...row, [field]: value } : row)),
     }));
 
-  // Adds the items picked in the search dialog as new rows; already present
-  // items are skipped and blank rows are dropped.
+  const removeItemRow = (rowId) =>
+    setForm((f) => ({ ...f, items: f.items.filter((r) => r.rowId !== rowId) }));
+
   const handlePicked = (picked) => {
-    setItems((list) => [...list, ...picked.filter((p) => !list.some((i) => i.id === p.id))]);
-    setForm((f) => {
-      const kept = f.items.filter((r) => r.itemId);
-      const added = picked
-        .filter((p) => !kept.some((r) => r.itemId === p.id))
-        .map((p) => ({ itemId: p.id, quantity: 1 }));
-      const next = [...kept, ...added];
-      return { ...f, items: next.length > 0 ? next : [{ itemId: '', quantity: 1 }] };
-    });
+    setItems((list) => mergeItems(list, picked));
+    setForm((f) => ({ ...f, items: appendPickedRows(f.items, picked) }));
   };
 
   const handleSave = async () => {
     const validItems = form.items.filter((i) => i.itemId && Number(i.quantity) > 0);
-    if (!form.customerId || !form.salesRepresentativeId || validItems.length === 0) {
-      setError('Vyplňte zákazníka, obchodního zástupce a alespoň jednu položku.');
+    if (!form.customerId || (!isCustomer && !form.salesRepresentativeId) || validItems.length === 0) {
+      setError(
+        isCustomer
+          ? 'Přidejte alespoň jednu položku objednávky.'
+          : 'Vyplňte zákazníka, obchodního zástupce a alespoň jednu položku.'
+      );
       return;
     }
     setSaving(true);
@@ -534,7 +661,8 @@ function NewOrderDialog({ open, onClose, onSaved }) {
         customerId: form.customerId,
         // Own company issuing the order; the backend falls back to the default company.
         companyId: activeCompany?.id || null,
-        salesRepresentativeId: form.salesRepresentativeId,
+        // A customer has no sales rep picker; the backend assigns one to the order.
+        salesRepresentativeId: form.salesRepresentativeId || null,
         orderDate: new Date(form.orderDate).toISOString(),
         currency: form.currency,
         note: form.note || null,
@@ -559,49 +687,55 @@ function NewOrderDialog({ open, onClose, onSaved }) {
           </Alert>
         )}
         <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              select
-              label="Zákazník"
-              value={form.customerId}
-              onChange={(e) => setForm((f) => ({ ...f, customerId: e.target.value }))}
-              required
-              fullWidth
-            >
-              {customers.map((c) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.name}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              select
-              label="Obchodní zástupce"
-              value={form.salesRepresentativeId}
-              onChange={(e) => setForm((f) => ({ ...f, salesRepresentativeId: e.target.value }))}
-              required
-              fullWidth
-            >
-              {reps.map((r) => (
-                <MenuItem key={r.id} value={r.id}>
-                  {r.firstName} {r.lastName}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-          <Grid item xs={12} sm={6}>
+          {!isCustomer && (
+            <>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField
+                  select
+                  label="Zákazník"
+                  value={form.customerId}
+                  onChange={(e) => setForm((f) => ({ ...f, customerId: e.target.value }))}
+                  required
+                  fullWidth
+                >
+                  {customers.map((c) => (
+                    <MenuItem key={c.id} value={c.id}>
+                      {c.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField
+                  select
+                  label="Obchodní zástupce"
+                  value={form.salesRepresentativeId}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, salesRepresentativeId: e.target.value }))
+                  }
+                  required
+                  fullWidth
+                >
+                  {reps.map((r) => (
+                    <MenuItem key={r.id} value={r.id}>
+                      {r.firstName} {r.lastName}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+            </>
+          )}
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               label="Datum objednávky"
               type="datetime-local"
               value={form.orderDate}
               onChange={(e) => setForm((f) => ({ ...f, orderDate: e.target.value }))}
               fullWidth
-              InputLabelProps={{ shrink: true }}
+              slotProps={{ inputLabel: { shrink: true } }}
             />
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               select
               label="Měna"
@@ -617,11 +751,11 @@ function NewOrderDialog({ open, onClose, onSaved }) {
             </TextField>
           </Grid>
 
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Typography variant="subtitle2">Položky</Typography>
           </Grid>
           {lastOrder && (
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <Alert
                 severity="info"
                 onClose={() => setLastOrder(null)}
@@ -637,14 +771,14 @@ function NewOrderDialog({ open, onClose, onSaved }) {
               </Alert>
             </Grid>
           )}
-          {form.items.map((row, idx) => (
-            <Grid item xs={12} key={idx}>
+          {form.items.map((row) => (
+            <Grid size={{ xs: 12 }} key={row.rowId}>
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                 <TextField
                   select
                   label="Položka"
                   value={row.itemId}
-                  onChange={(e) => setItemRow(idx, 'itemId', e.target.value)}
+                  onChange={(e) => setItemRow(row.rowId, 'itemId', e.target.value)}
                   sx={{ flexGrow: 1 }}
                   size="small"
                 >
@@ -662,14 +796,12 @@ function NewOrderDialog({ open, onClose, onSaved }) {
                   type="number"
                   size="small"
                   value={row.quantity}
-                  onChange={(e) => setItemRow(idx, 'quantity', e.target.value)}
-                  inputProps={{ min: 1 }}
+                  onChange={(e) => setItemRow(row.rowId, 'quantity', e.target.value)}
+                  slotProps={{ htmlInput: { min: 1 } }}
                   sx={{ width: 120 }}
                 />
                 <IconButton
-                  onClick={() =>
-                    setForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== idx) }))
-                  }
+                  onClick={() => removeItemRow(row.rowId)}
                   disabled={form.items.length === 1}
                 >
                   <DeleteIcon />
@@ -677,12 +809,12 @@ function NewOrderDialog({ open, onClose, onSaved }) {
               </Box>
             </Grid>
           ))}
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Button
               size="small"
               startIcon={<AddIcon />}
               onClick={() =>
-                setForm((f) => ({ ...f, items: [...f.items, { itemId: '', quantity: 1 }] }))
+                setForm((f) => ({ ...f, items: [...f.items, newRow()] }))
               }
             >
               Přidat položku
@@ -691,7 +823,7 @@ function NewOrderDialog({ open, onClose, onSaved }) {
               Vyhledat zboží
             </Button>
           </Grid>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <TextField
               label="Poznámka"
               value={form.note}
@@ -720,8 +852,11 @@ function NewOrderDialog({ open, onClose, onSaved }) {
 
 export default function OrdersPage() {
   const { activeCompany } = useCompany() || {};
+  const { user, isCustomer } = useAuth();
   const [orders, setOrders] = useState([]);
   const [filters, setFilters] = useState([]);
+  // Zobrazit pouze objednávky bez přiřazeného obchodního zástupce.
+  const [onlyUnassigned, setOnlyUnassigned] = useState(false);
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(25);
   const [total, setTotal] = useState(0);
@@ -731,6 +866,7 @@ export default function OrdersPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState(null);
   const [invoicingOrder, setInvoicingOrder] = useState(null);
+  const [assigningOrder, setAssigningOrder] = useState(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -740,6 +876,11 @@ export default function OrdersPage() {
     params.set('sort', 'orderDate,desc');
     // The list is scoped to the currently selected own company.
     if (activeCompany) params.append('filter', `company.id:eq:${activeCompany.id}`);
+    // Zákazník vidí pouze objednávky svého zákaznického záznamu.
+    if (isCustomer && user?.customerId)
+      params.append('filter', `customer.id:eq:${user.customerId}`);
+    // Objednávky zadané zákazníky čekající na přiřazení obchodního zástupce.
+    if (onlyUnassigned) params.append('filter', 'salesRepresentative:isNull');
     filters.forEach((f) => params.append('filter', f));
     client
       .get('/orders/search', { params })
@@ -749,7 +890,7 @@ export default function OrdersPage() {
       })
       .catch(() => setError('Nepodařilo se načíst objednávky.'))
       .finally(() => setLoading(false));
-  }, [page, size, filters, activeCompany]);
+  }, [page, size, filters, onlyUnassigned, activeCompany, isCustomer, user]);
 
   useEffect(load, [load]);
 
@@ -804,6 +945,23 @@ export default function OrdersPage() {
         }}
       />
 
+      {/* Zákazníkovy objednávky zástupce nemají, filtr pro něj nemá smysl. */}
+      {!isCustomer && (
+        <FormControlLabel
+          sx={{ mb: 1 }}
+          control={
+            <Checkbox
+              checked={onlyUnassigned}
+              onChange={(e) => {
+                setOnlyUnassigned(e.target.checked);
+                setPage(0);
+              }}
+            />
+          }
+          label="Pouze nepřiřazené obchodnímu zástupci"
+        />
+      )}
+
       <TableContainer component={Paper}>
         {loading && <LinearProgress />}
         <Table size="small">
@@ -829,6 +987,8 @@ export default function OrdersPage() {
                 onEditItems={setEditingOrder}
                 onPrint={handlePrint}
                 onIssueInvoice={setInvoicingOrder}
+                onAssignRep={setAssigningOrder}
+                readOnly={isCustomer}
               />
             ))}
             {orders.length === 0 && !loading && (
@@ -849,7 +1009,7 @@ export default function OrdersPage() {
           onPageChange={(_, p) => setPage(p)}
           rowsPerPage={size}
           onRowsPerPageChange={(e) => {
-            setSize(parseInt(e.target.value, 10));
+            setSize(Number.parseInt(e.target.value, 10));
             setPage(0);
           }}
           rowsPerPageOptions={[10, 25, 50]}
@@ -862,6 +1022,16 @@ export default function OrdersPage() {
         onClose={() => setEditingOrder(null)}
         onSaved={() => {
           setSnack('Položky objednávky byly upraveny.');
+          load();
+        }}
+      />
+      <AssignRepDialog
+        order={assigningOrder}
+        onClose={() => setAssigningOrder(null)}
+        onSaved={(saved) => {
+          setSnack(
+            `Objednávce ${saved.orderNumber} byl přiřazen obchodní zástupce ${saved.salesRepresentativeName || ''}.`
+          );
           load();
         }}
       />

@@ -63,7 +63,7 @@ function CompanyLogo({ companyId }) {
     client
       .get(`/companies/${companyId}/logo`, { responseType: 'blob' })
       .then((res) => {
-        if (!cancelled && res.data && res.data.size > 0) {
+        if (!cancelled && res.data?.size > 0) {
           objectUrl = URL.createObjectURL(res.data);
           setUrl(objectUrl);
         }
@@ -89,7 +89,7 @@ function CompanyLogo({ companyId }) {
 }
 
 export default function Layout({ children }) {
-  const { user, isOwner, logout } = useAuth();
+  const { user, isOwner, isCustomer, logout } = useAuth();
   const { companySelectionAvailable, companies, activeCompany, selectCompany } = useCompany();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -131,18 +131,27 @@ export default function Layout({ children }) {
     </Menu>
   );
 
-  const navItems = [
-    { to: '/', label: 'Dashboard', icon: <DashboardIcon /> },
-    { to: '/customers', label: 'Zákazníci', icon: <PeopleIcon /> },
-    { to: '/quotations', label: 'Cenové nabídky', icon: <RequestQuoteIcon /> },
-    { to: '/orders', label: 'Objednávky', icon: <ShoppingCartIcon /> },
-    { to: '/invoices', label: 'Faktury', icon: <ReceiptLongIcon /> },
-    { to: '/meetings', label: 'Schůzky', icon: <EventIcon /> },
-    { to: '/items', label: 'Položky', icon: <Inventory2Icon /> },
-    ...(isOwner ? [{ to: '/campaigns', label: 'Kampaně', icon: <CampaignIcon /> }] : []),
-    { to: '/ai-chat', label: 'AI chat', icon: <SmartToyIcon /> },
-    { to: '/reports', label: 'Reporty', icon: <AssessmentIcon /> },
-  ];
+  // Zákazník má v menu k dispozici pouze Dashboard, Objednávky, Faktury a Schůzky
+  // (vždy omezené na jeho vlastní záznamy).
+  const navItems = isCustomer
+    ? [
+        { to: '/', label: 'Dashboard', icon: <DashboardIcon /> },
+        { to: '/orders', label: 'Objednávky', icon: <ShoppingCartIcon /> },
+        { to: '/invoices', label: 'Faktury', icon: <ReceiptLongIcon /> },
+        { to: '/meetings', label: 'Schůzky', icon: <EventIcon /> },
+      ]
+    : [
+        { to: '/', label: 'Dashboard', icon: <DashboardIcon /> },
+        { to: '/customers', label: 'Zákazníci', icon: <PeopleIcon /> },
+        { to: '/quotations', label: 'Cenové nabídky', icon: <RequestQuoteIcon /> },
+        { to: '/orders', label: 'Objednávky', icon: <ShoppingCartIcon /> },
+        { to: '/invoices', label: 'Faktury', icon: <ReceiptLongIcon /> },
+        { to: '/meetings', label: 'Schůzky', icon: <EventIcon /> },
+        { to: '/items', label: 'Položky', icon: <Inventory2Icon /> },
+        ...(isOwner ? [{ to: '/campaigns', label: 'Kampaně', icon: <CampaignIcon /> }] : []),
+        { to: '/ai-chat', label: 'AI chat', icon: <SmartToyIcon /> },
+        { to: '/reports', label: 'Reporty', icon: <AssessmentIcon /> },
+      ];
 
   const adminItems = isOwner
     ? [

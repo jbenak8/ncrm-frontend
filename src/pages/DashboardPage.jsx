@@ -8,7 +8,6 @@ import {
   Chip,
   CircularProgress,
   FormControlLabel,
-  Grid,
   Table,
   TableBody,
   TableCell,
@@ -16,6 +15,7 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import {
   Bar,
   BarChart,
@@ -31,8 +31,10 @@ import { useAuth } from '../auth/AuthContext';
 import { useCompany } from '../company/CompanyContext';
 import { filterByCompanyIds } from '../utils/companyFilter';
 import {
+  formatDate,
   formatDateTime,
   formatMoney,
+  INVOICE_PAYMENT_LABELS,
   MEETING_STATUS_LABELS,
   ORDER_STATUS_LABELS,
   STATUS_COLORS,
@@ -115,6 +117,10 @@ function OwnerDashboard({ filterByCompany }) {
   const openOrders = visibleOrders.filter(
     (o) => !['COMPLETED', 'CANCELLED'].includes(o.status)
   );
+  // Objednávky bez přiřazeného obchodního zástupce (bez zrušených).
+  const unassignedOrders = visibleOrders.filter(
+    (o) => !o.salesRepresentativeId && o.status !== 'CANCELLED'
+  );
   // Hodnota objednávek vybrané společnosti (bez zrušených).
   const ordersRevenue = visibleOrders
     .filter((o) => o.status !== 'CANCELLED')
@@ -188,28 +194,37 @@ function OwnerDashboard({ filterByCompany }) {
   ).sort((a, b) => b.revenue - a.revenue);
   return (
     <Grid container spacing={2}>
-      <Grid item xs={12} sm={6} md={3}>
+      {unassignedOrders.length > 0 && (
+        <Grid size={{ xs: 12 }}>
+          <Alert severity="warning">
+            {unassignedOrders.length === 1
+              ? 'Existuje 1 objednávka bez přiřazeného obchodního zástupce.'
+              : `Existují objednávky bez přiřazeného obchodního zástupce (${unassignedOrders.length}).`}
+          </Alert>
+        </Grid>
+      )}
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <StatCard
           title="Zákazníci"
           value={s.totalCustomers ?? 0}
           subtitle={`${s.activeCustomers ?? 0} aktivních`}
         />
       </Grid>
-      <Grid item xs={12} sm={6} md={3}>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <StatCard
           title="Objednávky"
           value={visibleOrders.length}
           subtitle={`${openOrders.length} otevřených`}
         />
       </Grid>
-      <Grid item xs={12} sm={6} md={3}>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <StatCard
           title="Tržby celkem"
           value={formatMoney(invoicedRevenue)}
           subtitle={`Hodnota objednávek celkem: ${formatMoney(ordersRevenue)}`}
         />
       </Grid>
-      <Grid item xs={12} sm={6} md={3}>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <StatCard
           title="Schůzky"
           value={plannedMeetings}
@@ -217,7 +232,7 @@ function OwnerDashboard({ filterByCompany }) {
         />
       </Grid>
 
-      <Grid item xs={12} md={7}>
+      <Grid size={{ xs: 12, md: 7 }}>
         <Card>
           <CardContent>
             <Typography variant="h6" gutterBottom>
@@ -240,7 +255,7 @@ function OwnerDashboard({ filterByCompany }) {
         </Card>
       </Grid>
 
-      <Grid item xs={12} md={5}>
+      <Grid size={{ xs: 12, md: 5 }}>
         <Card sx={{ height: '100%' }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
@@ -268,7 +283,7 @@ function OwnerDashboard({ filterByCompany }) {
         </Card>
       </Grid>
 
-      <Grid item xs={12}>
+      <Grid size={{ xs: 12 }}>
         <Card>
           <CardContent>
             <Typography variant="h6" gutterBottom>
@@ -314,7 +329,7 @@ function OwnerDashboard({ filterByCompany }) {
         </Card>
       </Grid>
 
-      <Grid item xs={12}>
+      <Grid size={{ xs: 12 }}>
         <Card>
           <CardContent>
             <Typography variant="h6" gutterBottom>
@@ -372,20 +387,33 @@ function RepresentativeDashboard({ filterByCompany }) {
   // Objednávky a schůzky jsou omezeny na vybranou společnost (viz checkbox Zobrazit vše).
   const visibleOrders = filterByCompany(orders);
   const openOrders = visibleOrders.filter((o) => !['COMPLETED', 'CANCELLED'].includes(o.status));
+  // Objednávky bez přiřazeného obchodního zástupce (bez zrušených).
+  const unassignedOrders = visibleOrders.filter(
+    (o) => !o.salesRepresentativeId && o.status !== 'CANCELLED'
+  );
   const plannedMeetings = filterByCompany(meetings)
     .filter((m) => m.status === 'PLANNED')
     .sort((a, b) => (a.plannedDate || '').localeCompare(b.plannedDate || ''));
 
   return (
     <Grid container spacing={2}>
-      <Grid item xs={12} sm={6} md={3}>
+      {unassignedOrders.length > 0 && (
+        <Grid size={{ xs: 12 }}>
+          <Alert severity="warning">
+            {unassignedOrders.length === 1
+              ? 'Existuje 1 objednávka bez přiřazeného obchodního zástupce.'
+              : `Existují objednávky bez přiřazeného obchodního zástupce (${unassignedOrders.length}).`}
+          </Alert>
+        </Grid>
+      )}
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <StatCard title="Objednávky" value={visibleOrders.length} subtitle={`${openOrders.length} otevřených`} />
       </Grid>
-      <Grid item xs={12} sm={6} md={3}>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <StatCard title="Plánované schůzky" value={plannedMeetings.length} />
       </Grid>
 
-      <Grid item xs={12} md={6}>
+      <Grid size={{ xs: 12, md: 6 }}>
         <Card sx={{ height: '100%' }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
@@ -421,7 +449,7 @@ function RepresentativeDashboard({ filterByCompany }) {
         </Card>
       </Grid>
 
-      <Grid item xs={12} md={6}>
+      <Grid size={{ xs: 12, md: 6 }}>
         <Card sx={{ height: '100%' }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
@@ -460,8 +488,182 @@ function RepresentativeDashboard({ filterByCompany }) {
   );
 }
 
+// Dashboard přihlášeného zákazníka: zobrazuje pouze objednávky, schůzky a faktury
+// přiřazené jeho zákaznickému záznamu (backend seznamy omezuje, klientský filtr
+// podle customerId je pojistka).
+function CustomerDashboard() {
+  const { user } = useAuth();
+  const [orders, setOrders] = useState(null);
+  const [meetings, setMeetings] = useState(null);
+  const [invoices, setInvoices] = useState(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    Promise.all([client.get('/orders'), client.get('/meetings'), client.get('/invoices')])
+      .then(([o, m, i]) => {
+        setOrders(o.data);
+        setMeetings(m.data);
+        setInvoices(i.data);
+      })
+      .catch(() => setError('Nepodařilo se načíst data dashboardu.'));
+  }, []);
+
+  if (error) return <Alert severity="error">{error}</Alert>;
+  if (!orders || !meetings || !invoices)
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 6 }}>
+        <CircularProgress />
+      </Box>
+    );
+
+  const onlyMine = (items) =>
+    user?.customerId ? items.filter((it) => it.customerId === user.customerId) : items;
+  const myOrders = onlyMine(orders).sort((a, b) =>
+    (b.orderDate || '').localeCompare(a.orderDate || '')
+  );
+  const myInvoices = onlyMine(invoices).sort((a, b) =>
+    (b.issueDate || '').localeCompare(a.issueDate || '')
+  );
+  const myMeetings = onlyMine(meetings);
+  const openOrders = myOrders.filter((o) => !['COMPLETED', 'CANCELLED'].includes(o.status));
+  const plannedMeetings = myMeetings
+    .filter((m) => m.status === 'PLANNED')
+    .sort((a, b) => (a.plannedDate || '').localeCompare(b.plannedDate || ''));
+  const invoicedTotal = myInvoices.reduce((sum, inv) => sum + (inv.totalGross ?? 0), 0);
+
+  return (
+    <Grid container spacing={2}>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <StatCard
+          title="Objednávky"
+          value={myOrders.length}
+          subtitle={`${openOrders.length} otevřených`}
+        />
+      </Grid>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <StatCard title="Plánované schůzky" value={plannedMeetings.length} />
+      </Grid>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <StatCard
+          title="Faktury"
+          value={myInvoices.length}
+          subtitle={`Celkem ${formatMoney(invoicedTotal)}`}
+        />
+      </Grid>
+
+      <Grid size={{ xs: 12, md: 6 }}>
+        <Card sx={{ height: '100%' }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Poslední objednávky
+            </Typography>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Číslo</TableCell>
+                  <TableCell>Datum</TableCell>
+                  <TableCell align="right">Cena</TableCell>
+                  <TableCell>Stav</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {myOrders.slice(0, 8).map((o) => (
+                  <TableRow key={o.id}>
+                    <TableCell>{o.orderNumber}</TableCell>
+                    <TableCell>{formatDateTime(o.orderDate)}</TableCell>
+                    <TableCell align="right">{formatMoney(o.totalPrice, o.currency)}</TableCell>
+                    <TableCell>
+                      <Chip
+                        size="small"
+                        label={ORDER_STATUS_LABELS[o.status] || o.status}
+                        color={STATUS_COLORS[o.status] || 'default'}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </Grid>
+
+      <Grid size={{ xs: 12, md: 6 }}>
+        <Card sx={{ height: '100%' }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Nejbližší schůzky
+            </Typography>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Termín</TableCell>
+                  <TableCell>Předmět</TableCell>
+                  <TableCell>Stav</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {plannedMeetings.slice(0, 8).map((m) => (
+                  <TableRow key={m.id}>
+                    <TableCell>{formatDateTime(m.plannedDate)}</TableCell>
+                    <TableCell>{m.subject}</TableCell>
+                    <TableCell>
+                      <Chip
+                        size="small"
+                        label={MEETING_STATUS_LABELS[m.status] || m.status}
+                        color={STATUS_COLORS[m.status] || 'default'}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </Grid>
+
+      <Grid size={{ xs: 12 }}>
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Faktury
+            </Typography>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Číslo faktury</TableCell>
+                  <TableCell>Objednávka</TableCell>
+                  <TableCell>Platba</TableCell>
+                  <TableCell>Vystaveno</TableCell>
+                  <TableCell>Splatnost</TableCell>
+                  <TableCell align="right">Celkem s DPH</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {myInvoices.slice(0, 8).map((inv) => (
+                  <TableRow key={inv.id}>
+                    <TableCell>{inv.invoiceNumber}</TableCell>
+                    <TableCell>{inv.orderNumber}</TableCell>
+                    <TableCell>
+                      {INVOICE_PAYMENT_LABELS[inv.paymentType] || inv.paymentType}
+                    </TableCell>
+                    <TableCell>{formatDate(inv.issueDate)}</TableCell>
+                    <TableCell>{formatDate(inv.dueDate)}</TableCell>
+                    <TableCell align="right">
+                      {formatMoney(inv.totalGross, inv.currency)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </Grid>
+    </Grid>
+  );
+}
+
 export default function DashboardPage() {
-  const { isOwner, isAdmin, user } = useAuth();
+  const { isOwner, isAdmin, isCustomer, user } = useAuth();
   const { companies, activeCompany } = useCompany();
   const [showAll, setShowAll] = useState(false);
   const displayName =
@@ -504,6 +706,8 @@ export default function DashboardPage() {
       </Box>
       {isOwner ? (
         <OwnerDashboard filterByCompany={filterByCompany} />
+      ) : isCustomer ? (
+        <CustomerDashboard />
       ) : (
         <RepresentativeDashboard filterByCompany={filterByCompany} />
       )}

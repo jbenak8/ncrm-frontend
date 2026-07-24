@@ -10,7 +10,6 @@ import {
   DialogContent,
   DialogTitle,
   FormControlLabel,
-  Grid,
   IconButton,
   LinearProgress,
   MenuItem,
@@ -28,6 +27,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -71,12 +71,14 @@ const emptyForm = {
   sendCredentials: false,
   roles: ['CUSTOMER'],
   companyIds: [],
+  customerId: '',
 };
 
 export default function UsersPage() {
   const { companies } = useCompany();
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [filters, setFilters] = useState([]);
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(10);
@@ -120,6 +122,14 @@ export default function UsersPage() {
       );
   }, []);
 
+  // Customers for assigning a CUSTOMER-only user to a customer.
+  useEffect(() => {
+    client
+      .get('/customers', { params: { page: 0, size: 1000, sort: 'name,asc' } })
+      .then((res) => setCustomers(res.data.content || []))
+      .catch(() => setCustomers([]));
+  }, []);
+
   const setLocked = async (user, locked) => {
     try {
       await client.post(`/users/${user.id}/locked/${locked}`);
@@ -154,8 +164,9 @@ export default function UsersPage() {
             locked: !!user.locked,
             mustChangePassword: !!user.mustChangePassword,
             sendCredentials: false,
-            roles: user.roles && user.roles.length > 0 ? user.roles : ['CUSTOMER'],
+            roles: user.roles?.length > 0 ? user.roles : ['CUSTOMER'],
             companyIds: user.companyIds || [],
+            customerId: user.customerId || '',
           }
         : emptyForm
     );
@@ -164,6 +175,18 @@ export default function UsersPage() {
   };
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+
+  // Human-readable names of assigned companies / customer for the table.
+  const companyNames = (u) =>
+    (u.companyIds || [])
+      .map((id) => companies.find((c) => c.id === id)?.name || id)
+      .join(', ');
+
+  const customerName = (u) =>
+    u.customerId ? customers.find((c) => c.id === u.customerId)?.name || u.customerId : '';
+
+  // The customer assignment applies only to users whose sole role is CUSTOMER.
+  const isCustomerOnly = form.roles.length === 1 && form.roles[0] === 'CUSTOMER';
 
   const handleSave = async () => {
     if (!form.username.trim() || !form.email.trim() || !form.firstName.trim() || !form.lastName.trim()) {
@@ -178,10 +201,18 @@ export default function UsersPage() {
       setFormError(PASSWORD_POLICY_DESCRIPTION);
       return;
     }
+    if (isCustomerOnly && !form.customerId) {
+      setFormError('Vyberte zákazníka, ke kterému bude uživatel přiřazen.');
+      return;
+    }
     setSaving(true);
     setFormError('');
     try {
-      const payload = { ...form, password: form.password || null };
+      const payload = {
+        ...form,
+        password: form.password || null,
+        customerId: isCustomerOnly ? form.customerId : null,
+      };
       if (editing) {
         await client.put(`/users/${editing.id}`, payload);
       } else {
@@ -244,6 +275,8 @@ export default function UsersPage() {
               <TableCell>Jméno</TableCell>
               <TableCell>E-mail</TableCell>
               <TableCell>Role</TableCell>
+              <TableCell>Společnosti</TableCell>
+              <TableCell>Zákazník</TableCell>
               <TableCell>Poslední přihlášení</TableCell>
               <TableCell>Stav</TableCell>
               <TableCell align="right">Akce</TableCell>
@@ -262,6 +295,8 @@ export default function UsersPage() {
                     <Chip key={r} size="small" label={ROLE_LABELS[r] || r} sx={{ mr: 0.5 }} />
                   ))}
                 </TableCell>
+                <TableCell>{companyNames(u) || '—'}</TableCell>
+                <TableCell>{customerName(u) || '—'}</TableCell>
                 <TableCell>{formatDateTime(u.lastLoginAt)}</TableCell>
                 <TableCell>
                   <Chip
@@ -300,7 +335,7 @@ export default function UsersPage() {
             ))}
             {users.length === 0 && !loading && (
               <TableRow>
-                <TableCell colSpan={7} align="center">
+                <TableCell colSpan={9} align="center">
                   <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
                     Žádní uživatelé.
                   </Typography>
@@ -316,7 +351,7 @@ export default function UsersPage() {
           onPageChange={(_, p) => setPage(p)}
           rowsPerPage={size}
           onRowsPerPageChange={(e) => {
-            setSize(parseInt(e.target.value, 10));
+            setSize(Number.parseInt(e.target.value, 10));
             setPage(0);
           }}
           rowsPerPageOptions={[10, 25, 50]}
@@ -333,7 +368,7 @@ export default function UsersPage() {
             </Alert>
           )}
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Uživatelské jméno"
                 value={form.username}
@@ -342,7 +377,7 @@ export default function UsersPage() {
                 fullWidth
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="E-mail"
                 value={form.email}
@@ -351,7 +386,7 @@ export default function UsersPage() {
                 fullWidth
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Jméno"
                 value={form.firstName}
@@ -360,7 +395,7 @@ export default function UsersPage() {
                 fullWidth
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Příjmení"
                 value={form.lastName}
@@ -369,7 +404,7 @@ export default function UsersPage() {
                 fullWidth
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label={editing ? 'Nové heslo (nepovinné)' : 'Heslo'}
                 type="password"
@@ -380,7 +415,7 @@ export default function UsersPage() {
                 helperText={PASSWORD_POLICY_DESCRIPTION}
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 select
                 label="Role"
@@ -391,7 +426,7 @@ export default function UsersPage() {
                     roles: typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value,
                   }))
                 }
-                SelectProps={{ multiple: true }}
+                slotProps={{ select: { multiple: true } }}
                 fullWidth
               >
                 {roles.map((r) => (
@@ -401,7 +436,26 @@ export default function UsersPage() {
                 ))}
               </TextField>
             </Grid>
-            <Grid item xs={12}>
+            {isCustomerOnly && (
+              <Grid size={{ xs: 12 }}>
+                <TextField
+                  select
+                  label="Zákazník"
+                  value={form.customerId}
+                  onChange={set('customerId')}
+                  required
+                  fullWidth
+                  helperText="Zákazník, ke kterému bude uživatel přiřazen."
+                >
+                  {customers.map((c) => (
+                    <MenuItem key={c.id} value={c.id}>
+                      {c.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+            )}
+            <Grid size={{ xs: 12 }}>
               <TextField
                 select
                 label="Přiřazené společnosti"
@@ -413,7 +467,7 @@ export default function UsersPage() {
                       typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value,
                   }))
                 }
-                SelectProps={{ multiple: true }}
+                slotProps={{ select: { multiple: true } }}
                 fullWidth
                 helperText="Bez přiřazení vidí uživatel data všech společností."
               >
@@ -424,7 +478,7 @@ export default function UsersPage() {
                 ))}
               </TextField>
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <FormControlLabel
                 control={
                   <Switch
@@ -456,7 +510,7 @@ export default function UsersPage() {
               />
             </Grid>
             {!editing && (
-              <Grid item xs={12}>
+              <Grid size={{ xs: 12 }}>
                 <FormControlLabel
                   control={
                     <Checkbox

@@ -12,7 +12,6 @@ import {
   DialogContent,
   DialogTitle,
   FormControlLabel,
-  Grid,
   IconButton,
   LinearProgress,
   ListItemText,
@@ -30,6 +29,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import AddIcon from '@mui/icons-material/Add';
 import SendIcon from '@mui/icons-material/Send';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -55,6 +55,8 @@ const SEARCH_FIELDS = [
   { name: 'sentAt', label: 'Odesláno', type: 'datetime' },
   { name: 'createdBy.username', label: 'Vytvořil', type: 'text' },
 ];
+
+const DELIVERY_STATUS_COLORS = { SENT: 'success', FAILED: 'error' };
 
 function CampaignRow({ campaign, onSend, onCancel }) {
   const [open, setOpen] = useState(false);
@@ -122,13 +124,7 @@ function CampaignRow({ campaign, onSend, onCancel }) {
                         <Chip
                           size="small"
                           label={r.deliveryStatus}
-                          color={
-                            r.deliveryStatus === 'SENT'
-                              ? 'success'
-                              : r.deliveryStatus === 'FAILED'
-                                ? 'error'
-                                : 'default'
-                          }
+                          color={DELIVERY_STATUS_COLORS[r.deliveryStatus] || 'default'}
                         />
                       </TableCell>
                       <TableCell>{formatDateTime(r.sentAt)}</TableCell>
@@ -240,7 +236,7 @@ function NewCampaignDialog({ open, onClose, onSaved }) {
           </Alert>
         )}
         <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               label="Název kampaně"
               value={form.name}
@@ -249,7 +245,7 @@ function NewCampaignDialog({ open, onClose, onSaved }) {
               fullWidth
             />
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               label="Předmět e-mailu"
               value={form.subject}
@@ -258,20 +254,20 @@ function NewCampaignDialog({ open, onClose, onSaved }) {
               fullWidth
             />
           </Grid>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <TextField
               select
               label="Příjemci (zákazníci)"
               value={form.customerIds}
               onChange={(e) => setForm((f) => ({ ...f, customerIds: e.target.value }))}
-              SelectProps={{
+              slotProps={{ select: {
                 multiple: true,
                 renderValue: (selected) =>
                   customers
                     .filter((c) => selected.includes(c.id))
                     .map((c) => c.name)
                     .join(', '),
-              }}
+              } }}
               required
               fullWidth
             >
@@ -283,17 +279,17 @@ function NewCampaignDialog({ open, onClose, onSaved }) {
               ))}
             </TextField>
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               label="Naplánovat na"
               type="datetime-local"
               value={form.scheduledAt}
               onChange={(e) => setForm((f) => ({ ...f, scheduledAt: e.target.value }))}
               fullWidth
-              InputLabelProps={{ shrink: true }}
+              slotProps={{ inputLabel: { shrink: true } }}
             />
           </Grid>
-          <Grid item xs={12} sm={6} sx={{ display: 'flex', alignItems: 'center' }}>
+          <Grid size={{ xs: 12, sm: 6 }} sx={{ display: 'flex', alignItems: 'center' }}>
             <FormControlLabel
               control={
                 <Checkbox checked={showAi} onChange={(e) => setShowAi(e.target.checked)} />
@@ -304,7 +300,7 @@ function NewCampaignDialog({ open, onClose, onSaved }) {
 
           {showAi && (
             <>
-              <Grid item xs={12} sm={4}>
+              <Grid size={{ xs: 12, sm: 4 }}>
                 <TextField
                   label="Téma"
                   value={ai.topic}
@@ -314,7 +310,7 @@ function NewCampaignDialog({ open, onClose, onSaved }) {
                   size="small"
                 />
               </Grid>
-              <Grid item xs={12} sm={3}>
+              <Grid size={{ xs: 12, sm: 3 }}>
                 <TextField
                   label="Cílová skupina"
                   value={ai.audience}
@@ -323,7 +319,7 @@ function NewCampaignDialog({ open, onClose, onSaved }) {
                   size="small"
                 />
               </Grid>
-              <Grid item xs={12} sm={2}>
+              <Grid size={{ xs: 12, sm: 2 }}>
                 <TextField
                   label="Tón"
                   value={ai.tone}
@@ -332,7 +328,7 @@ function NewCampaignDialog({ open, onClose, onSaved }) {
                   size="small"
                 />
               </Grid>
-              <Grid item xs={12} sm={2}>
+              <Grid size={{ xs: 12, sm: 2 }}>
                 <TextField
                   select
                   label="AI model"
@@ -345,7 +341,7 @@ function NewCampaignDialog({ open, onClose, onSaved }) {
                   <MenuItem value="CHATGPT">ChatGPT</MenuItem>
                 </TextField>
               </Grid>
-              <Grid item xs={12} sm={1} sx={{ display: 'flex', alignItems: 'center' }}>
+              <Grid size={{ xs: 12, sm: 1 }} sx={{ display: 'flex', alignItems: 'center' }}>
                 <Tooltip title="Vygenerovat obsah">
                   <span>
                     <IconButton color="primary" onClick={handleGenerate} disabled={aiLoading}>
@@ -357,7 +353,7 @@ function NewCampaignDialog({ open, onClose, onSaved }) {
             </>
           )}
 
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <TextField
               label="Obsah kampaně"
               value={form.body}
@@ -498,7 +494,7 @@ export default function CampaignsPage() {
           onPageChange={(_, p) => setPage(p)}
           rowsPerPage={size}
           onRowsPerPageChange={(e) => {
-            setSize(parseInt(e.target.value, 10));
+            setSize(Number.parseInt(e.target.value, 10));
             setPage(0);
           }}
           rowsPerPageOptions={[10, 25, 50]}

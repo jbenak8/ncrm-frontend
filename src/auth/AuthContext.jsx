@@ -4,6 +4,8 @@ import client, { setAuthHeader, setUnauthorizedHandler } from '../api/client';
 
 // Auth mode is driven by env variables:
 //   VITE_AUTH_MODE=basic     -> username/password login against the backend "local" profile (HTTP Basic)
+//   VITE_AUTH_MODE=db        -> username/password login against the backend "db-auth" profile
+//                               (POST /api/auth/login, database-issued Bearer JWT)
 //   VITE_AUTH_MODE=keycloak  -> redirect login via Keycloak (backend "prod" profile, Bearer JWT)
 const AUTH_MODE = import.meta.env.VITE_AUTH_MODE || 'basic';
 
@@ -34,7 +36,7 @@ export function AuthProvider({ children }) {
     } catch (e) {
       // The backend "local" profile uses in-memory users that are not present in the DB,
       // so /users/me returns 404 while the credentials are valid (invalid ones yield 401).
-      if (e.response && e.response.status === 404 && usernameHint) {
+      if (e.response?.status === 404 && usernameHint) {
         const roleByUsername = {
           owner: 'OWNER',
           rep: 'SALES_REPRESENTATIVE',
@@ -58,6 +60,7 @@ export function AuthProvider({ children }) {
     setAuthHeader(null);
     sessionStorage.removeItem('ncrm-basic-auth');
     sessionStorage.removeItem('ncrm-basic-user');
+    sessionStorage.removeItem('ncrm-db-token');
     setUser(null);
     if (AUTH_MODE === 'keycloak' && keycloak) {
       keycloak.logout({ redirectUri: window.location.origin });
@@ -78,6 +81,12 @@ export function AuthProvider({ children }) {
               kc.updateToken(30).then(() => setAuthHeader(`Bearer ${kc.token}`));
             await loadCurrentUser();
           }
+        } else if (AUTH_MODE === 'db') {
+          const token = sessionStorage.getItem('ncrm-db-token');
+          if (token) {
+            setAuthHeader(`Bearer ${token}`);
+            await loadCurrentUser();
+          }
         } else {
           const stored = sessionStorage.getItem('ncrm-basic-auth');
           if (stored) {
@@ -88,6 +97,7 @@ export function AuthProvider({ children }) {
       } catch (e) {
         setAuthHeader(null);
         sessionStorage.removeItem('ncrm-basic-auth');
+        sessionStorage.removeItem('ncrm-db-token');
       } finally {
         setInitializing(false);
       }
@@ -97,7 +107,8 @@ export function AuthProvider({ children }) {
 
   const loginBasic = useCallback(
     async (username, password) => {
-      const header = `Basic ${btoa(`${username}:${password}`)}`;
+      const credentials = btoa(`${username}:${password}`);
+      const header = `Basic ${credentials}`;
       setAuthHeader(header);
       try {
         const me = await loadCurrentUser(username);
@@ -105,14 +116,14 @@ export function AuthProvider({ children }) {
         // exists in the DB) and refuse disabled or locked accounts client-side
         // as well; mustChangePassword / credentialsExpired are handled by the
         // forced password-change dialog in App.
-        if (me && me.enabled === false) {
+        if (me?.enabled === false) {
           setAuthHeader(null);
           setUser(null);
           const err = new Error('Account is disabled');
           err.accountFlag = 'disabled';
           throw err;
         }
-        if (me && me.locked === true) {
+        if (me?.locked === true) {
           setAuthHeader(null);
           setUser(null);
           const err = new Error('Account is locked');
@@ -121,6 +132,25 @@ export function AuthProvider({ children }) {
         }
         sessionStorage.setItem('ncrm-basic-auth', header);
         sessionStorage.setItem('ncrm-basic-user', username);
+        return me;
+      } catch (e) {
+        setAuthHeader(null);
+        throw e;
+      }
+    },
+    [loadCurrentUser]
+  );
+
+  // Login against the backend "db-auth" profile: exchanges the credentials for a
+  // database-issued JWT access token via POST /api/auth/login. Disabled or locked
+  // accounts are rejected by the backend with HTTP 401.
+  const loginDb = useCallback(
+    async (username, password) => {
+      const { data } = await client.post('/auth/login', { username, password });
+      setAuthHeader(`${data.tokenType || 'Bearer'} ${data.accessToken}`);
+      try {
+        const me = await loadCurrentUser(username);
+        sessionStorage.setItem('ncrm-db-token', data.accessToken);
         return me;
       } catch (e) {
         setAuthHeader(null);
@@ -144,6 +174,8 @@ export function AuthProvider({ children }) {
     const roles = user?.roles || [];
     const normalized = roles.map((r) => r.replace(/^ROLE_/, '').toUpperCase());
     const isAdmin = normalized.includes('ADMIN');
+    const isOwner = isAdmin || normalized.includes('OWNER');
+    const isSalesRep = normalized.includes('SALES_REPRESENTATIVE');
     return {
       authMode: AUTH_MODE,
       initializing,
@@ -151,17 +183,21 @@ export function AuthProvider({ children }) {
       isAuthenticated: !!user,
       // The administrator role has global access, i.e. everything the owner can do.
       isAdmin,
-      isOwner: isAdmin || normalized.includes('OWNER'),
-      isSalesRep: normalized.includes('SALES_REPRESENTATIVE'),
+      isOwner,
+      isSalesRep,
+      // A pure customer account (no owner/sales rep role) is tied to a single
+      // customer record and to the company it is assigned to.
+      isCustomer: !isOwner && !isSalesRep && normalized.includes('CUSTOMER'),
       // The user has to change their password before continuing.
       mustChangePassword: !!user && (user.mustChangePassword === true || user.credentialsExpired === true),
       roles: normalized,
       loginBasic,
+      loginDb,
       loginKeycloak,
       refreshUser,
       logout,
     };
-  }, [user, initializing, loginBasic, loginKeycloak, refreshUser, logout]);
+  }, [user, initializing, loginBasic, loginDb, loginKeycloak, refreshUser, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

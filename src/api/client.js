@@ -23,7 +23,7 @@ export function setUnauthorizedHandler(handler) {
 client.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401 && unauthorizedHandler) {
+    if (error.response?.status === 401 && unauthorizedHandler) {
       unauthorizedHandler();
     }
     return Promise.reject(error);

@@ -4,7 +4,7 @@ React based frontend for nCRM application (React 18 + Material UI 6 + Vite).
 
 ## Funkce
 
-- **Přihlašování** — HTTP Basic proti backend profilu `local` (uživatelé `owner` / `rep` / `customer`, heslo `test`), nebo **Keycloak** (JWT) pro profil `prod`. Při přihlášení se kontrolují flagy účtu (zakázaný, zamknutý, vypršelé heslo, vynucená změna hesla) — při vynucené změně hesla se zobrazí blokující dialog (původní heslo, nové heslo 2×) s politikou hesel (min. 8 znaků, velké i malé písmeno, číslice a speciální znak).
+- **Přihlašování** — tři volitelné režimy přepínané proměnnou `VITE_AUTH_MODE`: HTTP Basic proti backend profilu `local` (uživatelé `owner` / `rep` / `customer`, heslo `test`), **databázové přihlášení** (JWT) proti backend profilu `db-auth` — formulář jméno/heslo, token vydává backend přes `POST /api/auth/login`, nebo **Keycloak** (JWT) pro profil `prod`. Při přihlášení se kontrolují flagy účtu (zakázaný, zamknutý, vypršelé heslo, vynucená změna hesla) — při vynucené změně hesla se zobrazí blokující dialog (původní heslo, nové heslo 2×) s politikou hesel (min. 8 znaků, velké i malé písmeno, číslice a speciální znak).
 - **Dashboard dle role** — majitel (OWNER) vidí souhrn, grafy objednávek/tržeb, top zákazníky a výkon zástupců; obchodní zástupce vidí své schůzky a objednávky.
 - **Zákazníci** — stránkovaný seznam s vyhledáváním, detail (kontaktní osoby, provozovny, objednávky, schůzky), zakládání a editace s **doplněním dat z ARES** podle IČO.
 - **Objednávky** — seznam s rozbalitelnými položkami, vytváření, změny stavu (workflow NEW → CONFIRMED → IN_PROGRESS → COMPLETED / CANCELLED). U dokončených objednávek lze vystavit fakturu (platba hotově nebo převodem, volitelná splatnost a poznámka).
@@ -16,7 +16,7 @@ React based frontend for nCRM application (React 18 + Material UI 6 + Vite).
 - **Progress indikátory** — při načítání dat se zobrazuje indikátor průběhu.
 - **Katalog položek** — přehled zboží a služeb s filtrováním dle kategorií.
 - **Administrace základních dat** (pouze OWNER) — správa vlastních **společností** (CRUD, nastavení výchozí, doplnění z ARES), **zemí**, **sazeb DPH**, **číselných řad** (definice číslování objednávek a faktur — prefix, rok v čísle, počet číslic, roční reset čítače) a **obchodních zástupců**.
-- **Výběr společnosti** — po přihlášení vlastníka se automaticky použije výchozí společnost; pokud žádná není označena jako výchozí, zobrazí se dialog pro výběr, a pokud žádná neexistuje, varování s výzvou k založení (je-li navíc prázdný seznam zemí, je uživatel nejprve vyzván k přidání země). Přepínání společností je dostupné v hlavním menu i v menu uživatele (pouze OWNER — zákazníci a obchodní zástupci jsou přiřazeni konkrétní společnosti).
+- **Výběr společnosti** — po přihlášení vlastníka se automaticky použije výchozí společnost; pokud žádná není označena jako výchozí, zobrazí se dialog pro výběr, a pokud žádná neexistuje, varování s výzvou k založení (je-li navíc prázdný seznam zemí, je uživatel nejprve vyzván k přidání země). Přepínání společností je dostupné v hlavním menu i v menu uživatele (pouze OWNER — zákazníci a obchodní zástupci jsou přiřazeni konkrétní společnosti). Uživateli s rolí zákazník se po přihlášení automaticky předvybere společnost, ke které je přiřazen, a objednávky vytváří pro tuto společnost pod svými zákaznickými daty (bez výběru zákazníka a obchodního zástupce).
 - **Uživatelé** (pouze OWNER/ADMIN) — zakládání, editace a mazání účtů, zamknutí/odemknutí, povolení/zakázání a vynucení změny hesla. Role se načítají přes API (`GET /api/roles`); je zavedena role **ADMIN** s globálním přístupem. Při založení uživatele lze iniciální přihlašovací údaje zaslat e-mailem.
 - **Záhlaví** — vlevo se zobrazuje logo aktivní společnosti (pokud existuje), její název a až poté text „nCRM — moderní CRM nástroj“.
 - **Reporty** — stažení PDF reportů (přehled prodejů, výkon zástupce, objednávky zákazníka).
@@ -38,9 +38,32 @@ Viz `.env.example`:
 
 | Proměnná | Význam |
 |---|---|
-| `VITE_AUTH_MODE` | `basic` (výchozí, lokální profil backendu) nebo `keycloak` |
+| `VITE_AUTH_MODE` | `basic` (výchozí, lokální profil backendu), `db` (profil `db-auth`, přihlášení proti databázi aplikace) nebo `keycloak` (profil `prod`) |
 | `VITE_KEYCLOAK_URL` | URL Keycloak serveru |
 | `VITE_KEYCLOAK_REALM` | Keycloak realm |
 | `VITE_KEYCLOAK_CLIENT_ID` | Keycloak client id |
 
 Dev server běží na portu **3000**, který je povolen v CORS konfiguraci backendu.
+
+## Nasazení do cloudu
+
+Frontend lze nasadit jako kontejner (nginx, neprivilegovaný, port 8080) do
+**Dockeru**, **OpenShiftu** i **Google Cloudu (Cloud Run)** — podrobný návod viz
+[`deploy/README.md`](deploy/README.md).
+
+```bash
+# Docker
+docker build -t ncrm-frontend .
+docker run -p 3000:8080 -e BACKEND_URL=http://host.docker.internal:8080 ncrm-frontend
+# nebo: docker compose up --build
+
+# OpenShift
+oc apply -f deploy/openshift/ncrm-frontend.yaml
+
+# Google Cloud (Cloud Build -> Artifact Registry -> Cloud Run)
+gcloud builds submit --config deploy/gcp/cloudbuild.yaml \
+  --substitutions _BACKEND_URL=https://ncrm-backend-xxxx.a.run.app
+```
+
+Proměnné `VITE_*` se zapékají do bundle při buildu (`--build-arg`), backend URL
+pro proxy `/api` a `/actuator` se nastavuje za běhu proměnnou `BACKEND_URL`.

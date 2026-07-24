@@ -9,7 +9,6 @@ import {
   DialogContent,
   DialogTitle,
   FormControlLabel,
-  Grid,
   IconButton,
   List,
   ListItem,
@@ -20,6 +19,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -214,13 +214,13 @@ export default function CategoryManagerDialog({ open, categories, onClose, onCha
             </Alert>
           )}
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <TextField label="Kód" value={form.code} onChange={set('code')} required fullWidth />
             </Grid>
-            <Grid item xs={12} sm={8}>
+            <Grid size={{ xs: 12, sm: 8 }}>
               <TextField label="Název" value={form.name} onChange={set('name')} required fullWidth />
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <TextField
                 label="Popis"
                 value={form.description}
@@ -230,7 +230,7 @@ export default function CategoryManagerDialog({ open, categories, onClose, onCha
                 minRows={2}
               />
             </Grid>
-            <Grid item xs={12} sm={8}>
+            <Grid size={{ xs: 12, sm: 8 }}>
               <TextField
                 select
                 label="Nadřazená kategorie"
@@ -247,7 +247,7 @@ export default function CategoryManagerDialog({ open, categories, onClose, onCha
                 ))}
               </TextField>
             </Grid>
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <TextField
                 label="Pořadí"
                 type="number"
@@ -256,7 +256,7 @@ export default function CategoryManagerDialog({ open, categories, onClose, onCha
                 fullWidth
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <FormControlLabel
                 control={
                   <Switch

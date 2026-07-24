@@ -6,9 +6,9 @@ import {
   Card,
   CardActions,
   CardContent,
-  Grid,
   Typography,
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import client from '../api/client';
 import { useAuth } from '../auth/AuthContext';
@@ -66,7 +66,7 @@ export default function ReportsPage() {
 
       <Grid container spacing={2}>
         {isOwner && (
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
             <ReportCard
               title="Přehled prodejů"
               description="Souhrnný report prodejů celé firmy pro majitele — objednávky, tržby a výkonnost."
@@ -74,7 +74,7 @@ export default function ReportsPage() {
             />
           </Grid>
         )}
-        <Grid item xs={12} sm={6} md={4}>
+        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <ReportCard
             title="Výkon obchodního zástupce"
             description="Report výkonnosti obchodního zástupce — schůzky, objednávky a dosažené tržby."

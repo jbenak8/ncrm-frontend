@@ -12,11 +12,15 @@ function normalize(value) {
   return String(value ?? '').toLocaleLowerCase('cs');
 }
 
-function asComparable(value) {
-  if (typeof value === 'number') return value;
-  const num = Number(value);
-  if (value !== '' && value != null && !Number.isNaN(num)) return num;
-  return String(value ?? '');
+function isNumeric(value) {
+  if (typeof value === 'number') return true;
+  return value !== '' && value != null && !Number.isNaN(Number(value));
+}
+
+// Returns a negative number, zero or a positive number (like Array#sort comparators).
+function compareValues(a, b) {
+  if (isNumeric(a) && isNumeric(b)) return Number(a) - Number(b);
+  return String(a ?? '').localeCompare(String(b ?? ''), 'cs');
 }
 
 function matches(item, raw) {
@@ -33,13 +37,12 @@ function matches(item, raw) {
     case 'neq':
       return normalize(actual) !== normalize(rawValue);
     case 'lt':
-      return asComparable(actual) < asComparable(rawValue);
+      return compareValues(actual, rawValue) < 0;
     case 'gt':
-      return asComparable(actual) > asComparable(rawValue);
+      return compareValues(actual, rawValue) > 0;
     case 'between': {
       const [lower, upper] = rawValue.split(',');
-      const value = asComparable(actual);
-      return value >= asComparable(lower) && value <= asComparable(upper);
+      return compareValues(actual, lower) >= 0 && compareValues(actual, upper) <= 0;
     }
     default:
       return true;

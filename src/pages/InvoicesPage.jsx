@@ -9,7 +9,6 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
-  Grid,
   IconButton,
   LinearProgress,
   Paper,
@@ -23,10 +22,12 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import PrintIcon from '@mui/icons-material/Print';
 import EmailIcon from '@mui/icons-material/Email';
 import client from '../api/client';
+import { useAuth } from '../auth/AuthContext';
 import { useCompany } from '../company/CompanyContext';
 import SearchFilterBar from '../components/SearchFilterBar';
 import { filterByCompanyIds } from '../utils/companyFilter';
@@ -51,10 +52,10 @@ const SEARCH_FIELDS = [
 ];
 
 /** Detail of an issued invoice: header data and the snapshot of invoiced lines. */
-function InvoiceDetailDialog({ invoice, onClose, onPrint, onSend, sending }) {
+function InvoiceDetailDialog({ invoice, onClose, onPrint, onSend, sending, canSend }) {
   if (!invoice) return null;
   const field = (label, value) => (
-    <Grid item xs={12} sm={6} md={4}>
+    <Grid size={{ xs: 12, sm: 6, md: 4 }}>
       <Typography variant="caption" color="text.secondary">
         {label}
       </Typography>
@@ -133,9 +134,11 @@ function InvoiceDetailDialog({ invoice, onClose, onPrint, onSend, sending }) {
         <Button startIcon={<PrintIcon />} onClick={() => onPrint(invoice)}>
           Tisk PDF
         </Button>
-        <Button startIcon={<EmailIcon />} onClick={() => onSend(invoice)} disabled={sending}>
-          {sending ? 'Odesílám…' : 'Odeslat e-mailem'}
-        </Button>
+        {canSend && (
+          <Button startIcon={<EmailIcon />} onClick={() => onSend(invoice)} disabled={sending}>
+            {sending ? 'Odesílám…' : 'Odeslat e-mailem'}
+          </Button>
+        )}
         <Button variant="contained" onClick={onClose}>
           Zavřít
         </Button>
@@ -150,6 +153,7 @@ function InvoiceDetailDialog({ invoice, onClose, onPrint, onSend, sending }) {
  */
 export default function InvoicesPage() {
   const { activeCompany } = useCompany() || {};
+  const { user, isCustomer } = useAuth();
   const [invoices, setInvoices] = useState([]);
   const [filters, setFilters] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -198,7 +202,12 @@ export default function InvoicesPage() {
 
   // The list is scoped to the currently selected own company.
   const companyInvoices = filterByCompanyIds(invoices, activeCompany ? [activeCompany.id] : null);
-  const visibleInvoices = applyClientFilters(companyInvoices, filters);
+  // Zákazník vidí pouze faktury svého zákaznického záznamu.
+  const customerInvoices =
+    isCustomer && user?.customerId
+      ? companyInvoices.filter((inv) => inv.customerId === user.customerId)
+      : companyInvoices;
+  const visibleInvoices = applyClientFilters(customerInvoices, filters);
 
   return (
     <Box>
@@ -258,11 +267,13 @@ export default function InvoicesPage() {
                       <PrintIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="Odeslat zákazníkovi e-mailem">
-                    <IconButton size="small" onClick={() => handleSend(inv)} disabled={sending}>
-                      <EmailIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
+                  {!isCustomer && (
+                    <Tooltip title="Odeslat zákazníkovi e-mailem">
+                      <IconButton size="small" onClick={() => handleSend(inv)} disabled={sending}>
+                        <EmailIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
@@ -286,6 +297,7 @@ export default function InvoicesPage() {
         onPrint={handlePrint}
         onSend={handleSend}
         sending={sending}
+        canSend={!isCustomer}
       />
 
       <Snackbar

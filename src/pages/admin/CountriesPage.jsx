@@ -9,7 +9,6 @@ import {
   DialogContent,
   DialogTitle,
   FormControlLabel,
-  Grid,
   IconButton,
   LinearProgress,
   Paper,
@@ -25,6 +24,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import ToggleOnIcon from '@mui/icons-material/ToggleOn';
@@ -223,7 +223,7 @@ export default function CountriesPage() {
             </Alert>
           )}
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <TextField
                 label="ISO kód"
                 value={form.isoCode}
@@ -233,7 +233,7 @@ export default function CountriesPage() {
                 disabled={!!editing}
               />
             </Grid>
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <TextField
                 label="Předvolba"
                 value={form.dialingCode}
@@ -242,7 +242,7 @@ export default function CountriesPage() {
                 fullWidth
               />
             </Grid>
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <TextField
                 label="DPH kód"
                 value={form.vatShortCode}
@@ -250,10 +250,10 @@ export default function CountriesPage() {
                 fullWidth
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField label="Název" value={form.name} onChange={set('name')} required fullWidth />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Název (EN)"
                 value={form.nameEn}
@@ -262,7 +262,7 @@ export default function CountriesPage() {
                 fullWidth
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Název (místní)"
                 value={form.nameLocal}
@@ -270,7 +270,7 @@ export default function CountriesPage() {
                 fullWidth
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <FormControlLabel
                 control={<Switch checked={form.active} onChange={setBool('active')} />}
                 label="Aktivní"
