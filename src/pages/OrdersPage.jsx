@@ -11,7 +11,6 @@ import {
   DialogContent,
   DialogTitle,
   FormControlLabel,
-  Grid,
   IconButton,
   LinearProgress,
   MenuItem,
@@ -28,6 +27,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -69,7 +69,7 @@ const SEARCH_FIELDS = [
 ];
 
 // Order items may be modified only while the order is new or confirmed.
-const EDITABLE_STATUSES = ['NEW', 'CONFIRMED'];
+const EDITABLE_STATUSES = new Set(['NEW', 'CONFIRMED']);
 
 const NEXT_STATUSES = {
   NEW: ['CONFIRMED', 'CANCELLED'],
@@ -116,7 +116,7 @@ function OrderRow({ order, onStatusChange, onEditItems, onPrint, onIssueInvoice,
                 {ORDER_STATUS_LABELS[s]}
               </Button>
             ))}
-          {!readOnly && EDITABLE_STATUSES.includes(order.status) && (
+          {!readOnly && EDITABLE_STATUSES.has(order.status) && (
             <Tooltip title="Upravit položky objednávky">
               <IconButton size="small" onClick={() => onEditItems(order)}>
                 <EditIcon fontSize="small" />
@@ -186,6 +186,24 @@ function OrderRow({ order, onStatusChange, onEditItems, onPrint, onIssueInvoice,
   );
 }
 
+// Editable item row with a stable identity for React keys.
+const newRow = (itemId = '', quantity = 1) => ({ rowId: crypto.randomUUID(), itemId, quantity });
+
+// Merges the picked items into the item list without duplicates.
+const mergeItems = (list, picked) =>
+  [...list, ...picked.filter((p) => !list.some((i) => i.id === p.id))];
+
+// Appends the picked items as new rows; already present items are skipped
+// and blank rows are dropped.
+const appendPickedRows = (rows, picked) => {
+  const kept = rows.filter((r) => r.itemId);
+  const added = picked
+    .filter((p) => !kept.some((r) => r.itemId === p.id))
+    .map((p) => newRow(p.id, 1));
+  const next = [...kept, ...added];
+  return next.length > 0 ? next : [newRow()];
+};
+
 /**
  * Dialog for editing the items of an existing order. It is available only for
  * orders in the NEW or CONFIRMED status; the whole order (with the updated item
@@ -193,7 +211,7 @@ function OrderRow({ order, onStatusChange, onEditItems, onPrint, onIssueInvoice,
  */
 function EditOrderItemsDialog({ order, onClose, onSaved }) {
   const [items, setItems] = useState([]);
-  const [rows, setRows] = useState([{ itemId: '', quantity: 1 }]);
+  const [rows, setRows] = useState([newRow()]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -203,8 +221,8 @@ function EditOrderItemsDialog({ order, onClose, onSaved }) {
     setError('');
     setRows(
       (order.items || []).length > 0
-        ? order.items.map((i) => ({ itemId: i.itemId || '', quantity: i.quantity }))
-        : [{ itemId: '', quantity: 1 }]
+        ? order.items.map((i) => newRow(i.itemId || '', i.quantity))
+        : [newRow()]
     );
     client
       .get('/items')
@@ -212,21 +230,14 @@ function EditOrderItemsDialog({ order, onClose, onSaved }) {
       .catch(() => setItems([]));
   }, [order]);
 
-  const setRow = (idx, field, value) =>
-    setRows((rs) => rs.map((row, i) => (i === idx ? { ...row, [field]: value } : row)));
+  const setRow = (rowId, field, value) =>
+    setRows((rs) => rs.map((row) => (row.rowId === rowId ? { ...row, [field]: value } : row)));
 
-  // Adds the items picked in the search dialog as new rows; already present
-  // items are skipped and blank rows are dropped.
+  const removeRow = (rowId) => setRows((rs) => rs.filter((r) => r.rowId !== rowId));
+
   const handlePicked = (picked) => {
-    setItems((list) => [...list, ...picked.filter((p) => !list.some((i) => i.id === p.id))]);
-    setRows((rs) => {
-      const kept = rs.filter((r) => r.itemId);
-      const added = picked
-        .filter((p) => !kept.some((r) => r.itemId === p.id))
-        .map((p) => ({ itemId: p.id, quantity: 1 }));
-      const next = [...kept, ...added];
-      return next.length > 0 ? next : [{ itemId: '', quantity: 1 }];
-    });
+    setItems((list) => mergeItems(list, picked));
+    setRows((rs) => appendPickedRows(rs, picked));
   };
 
   const handleSave = async () => {
@@ -269,14 +280,14 @@ function EditOrderItemsDialog({ order, onClose, onSaved }) {
           </Alert>
         )}
         <Grid container spacing={2}>
-          {rows.map((row, idx) => (
-            <Grid item xs={12} key={idx}>
+          {rows.map((row) => (
+            <Grid size={{ xs: 12 }} key={row.rowId}>
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                 <TextField
                   select
                   label="Položka"
                   value={row.itemId}
-                  onChange={(e) => setRow(idx, 'itemId', e.target.value)}
+                  onChange={(e) => setRow(row.rowId, 'itemId', e.target.value)}
                   sx={{ flexGrow: 1 }}
                   size="small"
                 >
@@ -294,12 +305,12 @@ function EditOrderItemsDialog({ order, onClose, onSaved }) {
                   type="number"
                   size="small"
                   value={row.quantity}
-                  onChange={(e) => setRow(idx, 'quantity', e.target.value)}
-                  inputProps={{ min: 1 }}
+                  onChange={(e) => setRow(row.rowId, 'quantity', e.target.value)}
+                  slotProps={{ htmlInput: { min: 1 } }}
                   sx={{ width: 120 }}
                 />
                 <IconButton
-                  onClick={() => setRows((rs) => rs.filter((_, i) => i !== idx))}
+                  onClick={() => removeRow(row.rowId)}
                   disabled={rows.length === 1}
                 >
                   <DeleteIcon />
@@ -307,7 +318,7 @@ function EditOrderItemsDialog({ order, onClose, onSaved }) {
               </Box>
             </Grid>
           ))}
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Button
               size="small"
               startIcon={<AddIcon />}
@@ -441,13 +452,13 @@ function AssignRepDialog({ order, onClose, onSaved }) {
  * `POST /invoices`.
  */
 function IssueInvoiceDialog({ order, onClose, onIssued }) {
-  const [form, setForm] = useState({ paymentType: 'TRANSFER', dueDays: 14, note: '' });
+  const [form, setForm] = useState({ paymentType: 'TRANSFER', dueDays: '14', note: '' });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!order) return;
-    setForm({ paymentType: 'TRANSFER', dueDays: 14, note: '' });
+    setForm({ paymentType: 'TRANSFER', dueDays: '14', note: '' });
     setError('');
   }, [order]);
 
@@ -487,7 +498,7 @@ function IssueInvoiceDialog({ order, onClose, onIssued }) {
           </Alert>
         )}
         <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               select
               label="Způsob platby"
@@ -503,18 +514,18 @@ function IssueInvoiceDialog({ order, onClose, onIssued }) {
               ))}
             </TextField>
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               label="Splatnost (dny)"
               type="number"
               value={form.dueDays}
               onChange={(e) => setForm((f) => ({ ...f, dueDays: e.target.value }))}
               fullWidth
-              inputProps={{ min: 0, max: 365 }}
+              slotProps={{ htmlInput: { min: 0, max: 365 } }}
               helperText="Prázdné = výchozích 14 dnů"
             />
           </Grid>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <TextField
               label="Poznámka na faktuře"
               value={form.note}
@@ -522,7 +533,7 @@ function IssueInvoiceDialog({ order, onClose, onIssued }) {
               fullWidth
               multiline
               minRows={2}
-              inputProps={{ maxLength: 255 }}
+              slotProps={{ htmlInput: { maxLength: 255 } }}
             />
           </Grid>
         </Grid>
@@ -551,7 +562,7 @@ function NewOrderDialog({ open, onClose, onSaved }) {
     orderDate: dayjs().format('YYYY-MM-DDTHH:mm'),
     currency: 'CZK',
     note: '',
-    items: [{ itemId: '', quantity: 1 }],
+    items: [newRow()],
   });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -569,7 +580,7 @@ function NewOrderDialog({ open, onClose, onSaved }) {
       orderDate: dayjs().format('YYYY-MM-DDTHH:mm'),
       currency: 'CZK',
       note: '',
-      items: [{ itemId: '', quantity: 1 }],
+      items: [newRow()],
     });
     // A customer must not (and cannot) pick another customer or a sales rep.
     if (!isCustomer) {
@@ -612,31 +623,25 @@ function NewOrderDialog({ open, onClose, onSaved }) {
     if (!lastOrder) return;
     const rows = (lastOrder.items || [])
       .filter((i) => i.itemId)
-      .map((i) => ({ itemId: i.itemId, quantity: i.quantity }));
+      .map((i) => newRow(i.itemId, i.quantity));
     if (rows.length > 0) {
       setForm((f) => ({ ...f, items: rows }));
     }
     setLastOrder(null);
   };
 
-  const setItemRow = (idx, field, value) =>
+  const setItemRow = (rowId, field, value) =>
     setForm((f) => ({
       ...f,
-      items: f.items.map((row, i) => (i === idx ? { ...row, [field]: value } : row)),
+      items: f.items.map((row) => (row.rowId === rowId ? { ...row, [field]: value } : row)),
     }));
 
-  // Adds the items picked in the search dialog as new rows; already present
-  // items are skipped and blank rows are dropped.
+  const removeItemRow = (rowId) =>
+    setForm((f) => ({ ...f, items: f.items.filter((r) => r.rowId !== rowId) }));
+
   const handlePicked = (picked) => {
-    setItems((list) => [...list, ...picked.filter((p) => !list.some((i) => i.id === p.id))]);
-    setForm((f) => {
-      const kept = f.items.filter((r) => r.itemId);
-      const added = picked
-        .filter((p) => !kept.some((r) => r.itemId === p.id))
-        .map((p) => ({ itemId: p.id, quantity: 1 }));
-      const next = [...kept, ...added];
-      return { ...f, items: next.length > 0 ? next : [{ itemId: '', quantity: 1 }] };
-    });
+    setItems((list) => mergeItems(list, picked));
+    setForm((f) => ({ ...f, items: appendPickedRows(f.items, picked) }));
   };
 
   const handleSave = async () => {
@@ -684,7 +689,7 @@ function NewOrderDialog({ open, onClose, onSaved }) {
         <Grid container spacing={2}>
           {!isCustomer && (
             <>
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   select
                   label="Zákazník"
@@ -700,7 +705,7 @@ function NewOrderDialog({ open, onClose, onSaved }) {
                   ))}
                 </TextField>
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   select
                   label="Obchodní zástupce"
@@ -720,17 +725,17 @@ function NewOrderDialog({ open, onClose, onSaved }) {
               </Grid>
             </>
           )}
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               label="Datum objednávky"
               type="datetime-local"
               value={form.orderDate}
               onChange={(e) => setForm((f) => ({ ...f, orderDate: e.target.value }))}
               fullWidth
-              InputLabelProps={{ shrink: true }}
+              slotProps={{ inputLabel: { shrink: true } }}
             />
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               select
               label="Měna"
@@ -746,11 +751,11 @@ function NewOrderDialog({ open, onClose, onSaved }) {
             </TextField>
           </Grid>
 
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Typography variant="subtitle2">Položky</Typography>
           </Grid>
           {lastOrder && (
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <Alert
                 severity="info"
                 onClose={() => setLastOrder(null)}
@@ -766,14 +771,14 @@ function NewOrderDialog({ open, onClose, onSaved }) {
               </Alert>
             </Grid>
           )}
-          {form.items.map((row, idx) => (
-            <Grid item xs={12} key={idx}>
+          {form.items.map((row) => (
+            <Grid size={{ xs: 12 }} key={row.rowId}>
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                 <TextField
                   select
                   label="Položka"
                   value={row.itemId}
-                  onChange={(e) => setItemRow(idx, 'itemId', e.target.value)}
+                  onChange={(e) => setItemRow(row.rowId, 'itemId', e.target.value)}
                   sx={{ flexGrow: 1 }}
                   size="small"
                 >
@@ -791,14 +796,12 @@ function NewOrderDialog({ open, onClose, onSaved }) {
                   type="number"
                   size="small"
                   value={row.quantity}
-                  onChange={(e) => setItemRow(idx, 'quantity', e.target.value)}
-                  inputProps={{ min: 1 }}
+                  onChange={(e) => setItemRow(row.rowId, 'quantity', e.target.value)}
+                  slotProps={{ htmlInput: { min: 1 } }}
                   sx={{ width: 120 }}
                 />
                 <IconButton
-                  onClick={() =>
-                    setForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== idx) }))
-                  }
+                  onClick={() => removeItemRow(row.rowId)}
                   disabled={form.items.length === 1}
                 >
                   <DeleteIcon />
@@ -806,12 +809,12 @@ function NewOrderDialog({ open, onClose, onSaved }) {
               </Box>
             </Grid>
           ))}
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Button
               size="small"
               startIcon={<AddIcon />}
               onClick={() =>
-                setForm((f) => ({ ...f, items: [...f.items, { itemId: '', quantity: 1 }] }))
+                setForm((f) => ({ ...f, items: [...f.items, newRow()] }))
               }
             >
               Přidat položku
@@ -820,7 +823,7 @@ function NewOrderDialog({ open, onClose, onSaved }) {
               Vyhledat zboží
             </Button>
           </Grid>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <TextField
               label="Poznámka"
               value={form.note}
@@ -1006,7 +1009,7 @@ export default function OrdersPage() {
           onPageChange={(_, p) => setPage(p)}
           rowsPerPage={size}
           onRowsPerPageChange={(e) => {
-            setSize(parseInt(e.target.value, 10));
+            setSize(Number.parseInt(e.target.value, 10));
             setPage(0);
           }}
           rowsPerPageOptions={[10, 25, 50]}

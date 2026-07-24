@@ -8,7 +8,6 @@ import {
   Chip,
   CircularProgress,
   FormControlLabel,
-  Grid,
   Table,
   TableBody,
   TableCell,
@@ -16,6 +15,7 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import {
   Bar,
   BarChart,
@@ -195,7 +195,7 @@ function OwnerDashboard({ filterByCompany }) {
   return (
     <Grid container spacing={2}>
       {unassignedOrders.length > 0 && (
-        <Grid item xs={12}>
+        <Grid size={{ xs: 12 }}>
           <Alert severity="warning">
             {unassignedOrders.length === 1
               ? 'Existuje 1 objednávka bez přiřazeného obchodního zástupce.'
@@ -203,28 +203,28 @@ function OwnerDashboard({ filterByCompany }) {
           </Alert>
         </Grid>
       )}
-      <Grid item xs={12} sm={6} md={3}>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <StatCard
           title="Zákazníci"
           value={s.totalCustomers ?? 0}
           subtitle={`${s.activeCustomers ?? 0} aktivních`}
         />
       </Grid>
-      <Grid item xs={12} sm={6} md={3}>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <StatCard
           title="Objednávky"
           value={visibleOrders.length}
           subtitle={`${openOrders.length} otevřených`}
         />
       </Grid>
-      <Grid item xs={12} sm={6} md={3}>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <StatCard
           title="Tržby celkem"
           value={formatMoney(invoicedRevenue)}
           subtitle={`Hodnota objednávek celkem: ${formatMoney(ordersRevenue)}`}
         />
       </Grid>
-      <Grid item xs={12} sm={6} md={3}>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <StatCard
           title="Schůzky"
           value={plannedMeetings}
@@ -232,7 +232,7 @@ function OwnerDashboard({ filterByCompany }) {
         />
       </Grid>
 
-      <Grid item xs={12} md={7}>
+      <Grid size={{ xs: 12, md: 7 }}>
         <Card>
           <CardContent>
             <Typography variant="h6" gutterBottom>
@@ -255,7 +255,7 @@ function OwnerDashboard({ filterByCompany }) {
         </Card>
       </Grid>
 
-      <Grid item xs={12} md={5}>
+      <Grid size={{ xs: 12, md: 5 }}>
         <Card sx={{ height: '100%' }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
@@ -283,7 +283,7 @@ function OwnerDashboard({ filterByCompany }) {
         </Card>
       </Grid>
 
-      <Grid item xs={12}>
+      <Grid size={{ xs: 12 }}>
         <Card>
           <CardContent>
             <Typography variant="h6" gutterBottom>
@@ -329,7 +329,7 @@ function OwnerDashboard({ filterByCompany }) {
         </Card>
       </Grid>
 
-      <Grid item xs={12}>
+      <Grid size={{ xs: 12 }}>
         <Card>
           <CardContent>
             <Typography variant="h6" gutterBottom>
@@ -398,7 +398,7 @@ function RepresentativeDashboard({ filterByCompany }) {
   return (
     <Grid container spacing={2}>
       {unassignedOrders.length > 0 && (
-        <Grid item xs={12}>
+        <Grid size={{ xs: 12 }}>
           <Alert severity="warning">
             {unassignedOrders.length === 1
               ? 'Existuje 1 objednávka bez přiřazeného obchodního zástupce.'
@@ -406,14 +406,14 @@ function RepresentativeDashboard({ filterByCompany }) {
           </Alert>
         </Grid>
       )}
-      <Grid item xs={12} sm={6} md={3}>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <StatCard title="Objednávky" value={visibleOrders.length} subtitle={`${openOrders.length} otevřených`} />
       </Grid>
-      <Grid item xs={12} sm={6} md={3}>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <StatCard title="Plánované schůzky" value={plannedMeetings.length} />
       </Grid>
 
-      <Grid item xs={12} md={6}>
+      <Grid size={{ xs: 12, md: 6 }}>
         <Card sx={{ height: '100%' }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
@@ -449,7 +449,7 @@ function RepresentativeDashboard({ filterByCompany }) {
         </Card>
       </Grid>
 
-      <Grid item xs={12} md={6}>
+      <Grid size={{ xs: 12, md: 6 }}>
         <Card sx={{ height: '100%' }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
@@ -533,17 +533,17 @@ function CustomerDashboard() {
 
   return (
     <Grid container spacing={2}>
-      <Grid item xs={12} sm={6} md={3}>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <StatCard
           title="Objednávky"
           value={myOrders.length}
           subtitle={`${openOrders.length} otevřených`}
         />
       </Grid>
-      <Grid item xs={12} sm={6} md={3}>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <StatCard title="Plánované schůzky" value={plannedMeetings.length} />
       </Grid>
-      <Grid item xs={12} sm={6} md={3}>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <StatCard
           title="Faktury"
           value={myInvoices.length}
@@ -551,7 +551,7 @@ function CustomerDashboard() {
         />
       </Grid>
 
-      <Grid item xs={12} md={6}>
+      <Grid size={{ xs: 12, md: 6 }}>
         <Card sx={{ height: '100%' }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
@@ -587,7 +587,7 @@ function CustomerDashboard() {
         </Card>
       </Grid>
 
-      <Grid item xs={12} md={6}>
+      <Grid size={{ xs: 12, md: 6 }}>
         <Card sx={{ height: '100%' }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
@@ -621,7 +621,7 @@ function CustomerDashboard() {
         </Card>
       </Grid>
 
-      <Grid item xs={12}>
+      <Grid size={{ xs: 12 }}>
         <Card>
           <CardContent>
             <Typography variant="h6" gutterBottom>

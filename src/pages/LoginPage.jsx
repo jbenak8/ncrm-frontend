@@ -36,9 +36,9 @@ export default function LoginPage() {
         setError('Váš účet je zakázán. Kontaktujte prosím administrátora.');
       } else if (err.accountFlag === 'locked') {
         setError('Váš účet je zamknut. Kontaktujte prosím administrátora.');
-      } else if (err.response && err.response.status === 401) {
+      } else if (err.response?.status === 401) {
         setError('Neplatné uživatelské jméno nebo heslo.');
-      } else if (err.response && err.response.status === 403) {
+      } else if (err.response?.status === 403) {
         setError('Přihlášení bylo odmítnuto. Účet může být zakázán nebo zamknut.');
       } else {
         setError('Přihlášení se nezdařilo. Zkontrolujte, zda běží backend.');

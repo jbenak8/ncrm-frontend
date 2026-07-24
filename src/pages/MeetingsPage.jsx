@@ -8,7 +8,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Grid,
   IconButton,
   LinearProgress,
   MenuItem,
@@ -25,6 +24,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -126,7 +126,7 @@ function MeetingFormDialog({ open, meeting, onClose, onSaved }) {
           </Alert>
         )}
         <Grid container spacing={2}>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <TextField
               select
               label="Zákazník"
@@ -142,7 +142,7 @@ function MeetingFormDialog({ open, meeting, onClose, onSaved }) {
               ))}
             </TextField>
           </Grid>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <TextField
               select
               label="Obchodní zástupce"
@@ -158,7 +158,7 @@ function MeetingFormDialog({ open, meeting, onClose, onSaved }) {
               ))}
             </TextField>
           </Grid>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <TextField
               label="Předmět"
               value={form.subject}
@@ -167,7 +167,7 @@ function MeetingFormDialog({ open, meeting, onClose, onSaved }) {
               fullWidth
             />
           </Grid>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <TextField
               label="Plánovaný termín"
               type="datetime-local"
@@ -175,10 +175,10 @@ function MeetingFormDialog({ open, meeting, onClose, onSaved }) {
               onChange={(e) => setForm((f) => ({ ...f, plannedDate: e.target.value }))}
               required
               fullWidth
-              InputLabelProps={{ shrink: true }}
+              slotProps={{ inputLabel: { shrink: true } }}
             />
           </Grid>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <TextField
               label="Popis"
               value={form.description}
@@ -418,7 +418,7 @@ export default function MeetingsPage() {
           onPageChange={(_, p) => setPage(p)}
           rowsPerPage={size}
           onRowsPerPageChange={(e) => {
-            setSize(parseInt(e.target.value, 10));
+            setSize(Number.parseInt(e.target.value, 10));
             setPage(0);
           }}
           rowsPerPageOptions={[10, 25, 50]}

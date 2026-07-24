@@ -9,12 +9,12 @@ import {
   DialogTitle,
   Divider,
   FormControlLabel,
-  Grid,
   MenuItem,
   Switch,
   TextField,
   Typography,
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import client from '../api/client';
@@ -87,7 +87,7 @@ export default function ItemFormDialog({ open, item, categories, onClose, onSave
     setImageFile(null);
     setImageRemoved(false);
     setImagePreview('');
-    if (!item || !item.hasImage) return;
+    if (!item?.hasImage) return;
     let url = '';
     client
       .get(`/items/${item.id}/image`, { responseType: 'blob' })
@@ -95,7 +95,7 @@ export default function ItemFormDialog({ open, item, categories, onClose, onSave
         url = URL.createObjectURL(res.data);
         setImagePreview(url);
       })
-      .catch(() => {});
+      .catch(() => setImagePreview(''));
     return () => {
       if (url) URL.revokeObjectURL(url);
     };
@@ -187,7 +187,7 @@ export default function ItemFormDialog({ open, item, categories, onClose, onSave
           ({ data } = await client.put(`/items/${data.id}/image`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
           }));
-        } else if (imageRemoved && item && item.hasImage) {
+        } else if (imageRemoved && item?.hasImage) {
           await client.delete(`/items/${data.id}/image`);
           data = { ...data, hasImage: false };
         }
@@ -215,13 +215,13 @@ export default function ItemFormDialog({ open, item, categories, onClose, onSave
           </Alert>
         )}
         <Grid container spacing={2}>
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField label="Kód" value={form.code} onChange={set('code')} required fullWidth />
           </Grid>
-          <Grid item xs={12} sm={8}>
+          <Grid size={{ xs: 12, sm: 8 }}>
             <TextField label="Název" value={form.name} onChange={set('name')} required fullWidth />
           </Grid>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <TextField
               label="Popis"
               value={form.description}
@@ -231,13 +231,13 @@ export default function ItemFormDialog({ open, item, categories, onClose, onSave
               minRows={2}
             />
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField select label="Typ" value={form.itemType} onChange={set('itemType')} fullWidth>
               <MenuItem value="GOODS">Zboží</MenuItem>
               <MenuItem value="SERVICE">Služba</MenuItem>
             </TextField>
           </Grid>
-          <Grid item xs={12} sm={8}>
+          <Grid size={{ xs: 12, sm: 8 }}>
             <TextField
               select
               label="Kategorie"
@@ -254,10 +254,10 @@ export default function ItemFormDialog({ open, item, categories, onClose, onSave
               ))}
             </TextField>
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField label="Jednotka" value={form.unit} onChange={set('unit')} fullWidth />
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField
               label="Cena"
               type="number"
@@ -267,7 +267,7 @@ export default function ItemFormDialog({ open, item, categories, onClose, onSave
               fullWidth
             />
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField
               label="Nákupní cena bez DPH"
               type="number"
@@ -276,10 +276,10 @@ export default function ItemFormDialog({ open, item, categories, onClose, onSave
               fullWidth
             />
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField label="Měna" value={form.currency} onChange={set('currency')} required fullWidth />
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField
               select
               label="Sazba DPH (%)"
@@ -296,7 +296,7 @@ export default function ItemFormDialog({ open, item, categories, onClose, onSave
               ))}
             </TextField>
           </Grid>
-          <Grid item xs={12} sm={4} sx={{ display: 'flex', alignItems: 'center' }}>
+          <Grid size={{ xs: 12, sm: 4 }} sx={{ display: 'flex', alignItems: 'center' }}>
             <FormControlLabel
               control={
                 <Switch
@@ -308,14 +308,14 @@ export default function ItemFormDialog({ open, item, categories, onClose, onSave
             />
           </Grid>
 
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Divider>
               <Typography variant="caption" color="text.secondary">
                 Obrázek zboží
               </Typography>
             </Divider>
           </Grid>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               {imagePreview ? (
                 <Box
@@ -338,7 +338,7 @@ export default function ItemFormDialog({ open, item, categories, onClose, onSave
                 </Typography>
               )}
               <Button component="label" size="small" startIcon={<UploadFileIcon />}>
-                Nahrát obrázek
+                {'Nahrát obrázek'}
                 <input
                   type="file"
                   hidden

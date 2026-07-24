@@ -44,3 +44,26 @@ Viz `.env.example`:
 | `VITE_KEYCLOAK_CLIENT_ID` | Keycloak client id |
 
 Dev server běží na portu **3000**, který je povolen v CORS konfiguraci backendu.
+
+## Nasazení do cloudu
+
+Frontend lze nasadit jako kontejner (nginx, neprivilegovaný, port 8080) do
+**Dockeru**, **OpenShiftu** i **Google Cloudu (Cloud Run)** — podrobný návod viz
+[`deploy/README.md`](deploy/README.md).
+
+```bash
+# Docker
+docker build -t ncrm-frontend .
+docker run -p 3000:8080 -e BACKEND_URL=http://host.docker.internal:8080 ncrm-frontend
+# nebo: docker compose up --build
+
+# OpenShift
+oc apply -f deploy/openshift/ncrm-frontend.yaml
+
+# Google Cloud (Cloud Build -> Artifact Registry -> Cloud Run)
+gcloud builds submit --config deploy/gcp/cloudbuild.yaml \
+  --substitutions _BACKEND_URL=https://ncrm-backend-xxxx.a.run.app
+```
+
+Proměnné `VITE_*` se zapékají do bundle při buildu (`--build-arg`), backend URL
+pro proxy `/api` a `/actuator` se nastavuje za běhu proměnnou `BACKEND_URL`.

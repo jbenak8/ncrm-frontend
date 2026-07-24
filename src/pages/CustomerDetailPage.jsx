@@ -8,7 +8,6 @@ import {
   CardContent,
   Chip,
   CircularProgress,
-  Grid,
   IconButton,
   Snackbar,
   Tab,
@@ -21,6 +20,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EditIcon from '@mui/icons-material/Edit';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
@@ -127,7 +127,7 @@ export default function CustomerDetailPage() {
           <Card sx={{ mb: 2 }}>
             <CardContent>
               <Grid container spacing={2}>
-                <Grid item xs={12} sm={3}>
+                <Grid size={{ xs: 12, sm: 3 }}>
                   <Typography variant="caption" color="text.secondary">
                     IČO / DIČ
                   </Typography>
@@ -135,27 +135,27 @@ export default function CustomerDetailPage() {
                     {customer.registrationId} {customer.vatId ? `/ ${customer.vatId}` : ''}
                   </Typography>
                 </Grid>
-                <Grid item xs={12} sm={3}>
+                <Grid size={{ xs: 12, sm: 3 }}>
                   <Typography variant="caption" color="text.secondary">
                     Kontakt
                   </Typography>
                   <Typography>{customer.email || '—'}</Typography>
                   <Typography>{customer.phone || '—'}</Typography>
                 </Grid>
-                <Grid item xs={12} sm={3}>
+                <Grid size={{ xs: 12, sm: 3 }}>
                   <Typography variant="caption" color="text.secondary">
                     Sídlo
                   </Typography>
                   <Typography>{addressToString(customer.headquartersAddress)}</Typography>
                 </Grid>
-                <Grid item xs={12} sm={3}>
+                <Grid size={{ xs: 12, sm: 3 }}>
                   <Typography variant="caption" color="text.secondary">
                     Obchodní zástupce
                   </Typography>
                   <Typography>{customer.salesRepresentativeName || '—'}</Typography>
                 </Grid>
                 {customer.note && (
-                  <Grid item xs={12}>
+                  <Grid size={{ xs: 12 }}>
                     <Typography variant="caption" color="text.secondary">
                       Poznámka
                     </Typography>

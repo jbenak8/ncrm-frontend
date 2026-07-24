@@ -9,7 +9,6 @@ import {
   DialogTitle,
   Divider,
   FormControlLabel,
-  Grid,
   InputAdornment,
   MenuItem,
   Switch,
@@ -17,6 +16,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import client from '../api/client';
 
@@ -67,7 +67,7 @@ export default function CustomerFormDialog({ open, customer, onClose, onSaved })
         vatId: customer.vatId || '',
         email: customer.email || '',
         phone: customer.phone || '',
-        headquartersAddress: { ...emptyAddress, ...(customer.headquartersAddress || {}) },
+        headquartersAddress: { ...emptyAddress, ...customer.headquartersAddress },
         salesRepresentativeId: customer.salesRepresentativeId || '',
         active: customer.active !== false,
         note: customer.note || '',
@@ -108,11 +108,10 @@ export default function CustomerFormDialog({ open, customer, onClose, onSaved })
           ? { ...emptyAddress, ...data.address }
           : f.headquartersAddress,
       }));
-      setAresInfo(
-        `Data načtena z ARES${data.legalForm ? ` (právní forma: ${data.legalForm})` : ''}.`
-      );
+      const legalFormInfo = data.legalForm ? ` (právní forma: ${data.legalForm})` : '';
+      setAresInfo(`Data načtena z ARES${legalFormInfo}.`);
     } catch (e) {
-      if (e.response && e.response.status === 404) {
+      if (e.response?.status === 404) {
         setError(`Subjekt s IČO ${regId} nebyl v ARES nalezen.`);
       } else {
         setError('Vyhledání v ARES se nezdařilo.');
@@ -161,14 +160,14 @@ export default function CustomerFormDialog({ open, customer, onClose, onSaved })
           </Alert>
         )}
         <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               label="IČO"
               value={form.registrationId}
               onChange={set('registrationId')}
               required
               fullWidth
-              InputProps={{
+              slotProps={{ input: {
                 endAdornment: (
                   <InputAdornment position="end">
                     <Tooltip title="Doplnit údaje z registru ARES">
@@ -191,16 +190,16 @@ export default function CustomerFormDialog({ open, customer, onClose, onSaved })
                     </Tooltip>
                   </InputAdornment>
                 ),
-              }}
+              } }}
             />
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField label="DIČ" value={form.vatId} onChange={set('vatId')} fullWidth />
           </Grid>
-          <Grid item xs={12} sm={8}>
+          <Grid size={{ xs: 12, sm: 8 }}>
             <TextField label="Název" value={form.name} onChange={set('name')} required fullWidth />
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField
               label="Označení"
               value={form.designation}
@@ -208,21 +207,21 @@ export default function CustomerFormDialog({ open, customer, onClose, onSaved })
               fullWidth
             />
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField label="E-mail" value={form.email} onChange={set('email')} fullWidth />
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField label="Telefon" value={form.phone} onChange={set('phone')} fullWidth />
           </Grid>
 
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Divider>
               <Typography variant="caption" color="text.secondary">
                 Adresa sídla
               </Typography>
             </Divider>
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               label="Ulice"
               value={form.headquartersAddress.street}
@@ -230,7 +229,7 @@ export default function CustomerFormDialog({ open, customer, onClose, onSaved })
               fullWidth
             />
           </Grid>
-          <Grid item xs={12} sm={3}>
+          <Grid size={{ xs: 12, sm: 3 }}>
             <TextField
               label="Číslo popisné"
               value={form.headquartersAddress.houseNumber}
@@ -238,7 +237,7 @@ export default function CustomerFormDialog({ open, customer, onClose, onSaved })
               fullWidth
             />
           </Grid>
-          <Grid item xs={12} sm={3}>
+          <Grid size={{ xs: 12, sm: 3 }}>
             <TextField
               label="Číslo orientační"
               value={form.headquartersAddress.streetNumber}
@@ -246,7 +245,7 @@ export default function CustomerFormDialog({ open, customer, onClose, onSaved })
               fullWidth
             />
           </Grid>
-          <Grid item xs={12} sm={5}>
+          <Grid size={{ xs: 12, sm: 5 }}>
             <TextField
               label="Město"
               value={form.headquartersAddress.city}
@@ -254,7 +253,7 @@ export default function CustomerFormDialog({ open, customer, onClose, onSaved })
               fullWidth
             />
           </Grid>
-          <Grid item xs={12} sm={3}>
+          <Grid size={{ xs: 12, sm: 3 }}>
             <TextField
               label="PSČ"
               value={form.headquartersAddress.zipCode}
@@ -262,7 +261,7 @@ export default function CustomerFormDialog({ open, customer, onClose, onSaved })
               fullWidth
             />
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField
               label="Země"
               value={form.headquartersAddress.countryName}
@@ -271,7 +270,7 @@ export default function CustomerFormDialog({ open, customer, onClose, onSaved })
             />
           </Grid>
 
-          <Grid item xs={12} sm={8}>
+          <Grid size={{ xs: 12, sm: 8 }}>
             <TextField
               select
               label="Obchodní zástupce"
@@ -287,7 +286,7 @@ export default function CustomerFormDialog({ open, customer, onClose, onSaved })
               ))}
             </TextField>
           </Grid>
-          <Grid item xs={12} sm={4} sx={{ display: 'flex', alignItems: 'center' }}>
+          <Grid size={{ xs: 12, sm: 4 }} sx={{ display: 'flex', alignItems: 'center' }}>
             <FormControlLabel
               control={
                 <Switch
@@ -298,7 +297,7 @@ export default function CustomerFormDialog({ open, customer, onClose, onSaved })
               label="Aktivní"
             />
           </Grid>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <TextField
               label="Poznámka"
               value={form.note}

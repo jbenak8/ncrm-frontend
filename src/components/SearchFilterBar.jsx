@@ -49,8 +49,8 @@ function ValueInput({ field, value, onChange, size = 'small' }) {
       </TextField>
     );
   }
-  const inputType =
-    field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : field.type === 'datetime' ? 'datetime-local' : 'text';
+  const INPUT_TYPES = { number: 'number', date: 'date', datetime: 'datetime-local' };
+  const inputType = INPUT_TYPES[field.type] || 'text';
   return (
     <TextField
       size={size}
@@ -58,7 +58,7 @@ function ValueInput({ field, value, onChange, size = 'small' }) {
       type={inputType}
       value={value}
       onChange={onChange}
-      InputLabelProps={inputType === 'text' ? undefined : { shrink: true }}
+      slotProps={{ inputLabel: inputType === 'text' ? undefined : { shrink: true } }}
       sx={{ minWidth: 180 }}
     />
   );
@@ -93,7 +93,8 @@ export default function SearchFilterBar({ fields, filters, onChange }) {
 
   const addFilter = () => {
     if (!selectedField || value === '' || (operator === 'between' && valueTo === '')) return;
-    const raw = `${selectedField.name}:${operator}:${operator === 'between' ? `${value},${valueTo}` : value}`;
+    const filterValue = operator === 'between' ? `${value},${valueTo}` : value;
+    const raw = `${selectedField.name}:${operator}:${filterValue}`;
     onChange([...filters, raw]);
     setValue('');
     setValueTo('');

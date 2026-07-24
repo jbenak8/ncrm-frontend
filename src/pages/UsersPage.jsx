@@ -10,7 +10,6 @@ import {
   DialogContent,
   DialogTitle,
   FormControlLabel,
-  Grid,
   IconButton,
   LinearProgress,
   MenuItem,
@@ -28,6 +27,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -164,7 +164,7 @@ export default function UsersPage() {
             locked: !!user.locked,
             mustChangePassword: !!user.mustChangePassword,
             sendCredentials: false,
-            roles: user.roles && user.roles.length > 0 ? user.roles : ['CUSTOMER'],
+            roles: user.roles?.length > 0 ? user.roles : ['CUSTOMER'],
             companyIds: user.companyIds || [],
             customerId: user.customerId || '',
           }
@@ -351,7 +351,7 @@ export default function UsersPage() {
           onPageChange={(_, p) => setPage(p)}
           rowsPerPage={size}
           onRowsPerPageChange={(e) => {
-            setSize(parseInt(e.target.value, 10));
+            setSize(Number.parseInt(e.target.value, 10));
             setPage(0);
           }}
           rowsPerPageOptions={[10, 25, 50]}
@@ -368,7 +368,7 @@ export default function UsersPage() {
             </Alert>
           )}
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Uživatelské jméno"
                 value={form.username}
@@ -377,7 +377,7 @@ export default function UsersPage() {
                 fullWidth
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="E-mail"
                 value={form.email}
@@ -386,7 +386,7 @@ export default function UsersPage() {
                 fullWidth
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Jméno"
                 value={form.firstName}
@@ -395,7 +395,7 @@ export default function UsersPage() {
                 fullWidth
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Příjmení"
                 value={form.lastName}
@@ -404,7 +404,7 @@ export default function UsersPage() {
                 fullWidth
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label={editing ? 'Nové heslo (nepovinné)' : 'Heslo'}
                 type="password"
@@ -415,7 +415,7 @@ export default function UsersPage() {
                 helperText={PASSWORD_POLICY_DESCRIPTION}
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 select
                 label="Role"
@@ -426,7 +426,7 @@ export default function UsersPage() {
                     roles: typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value,
                   }))
                 }
-                SelectProps={{ multiple: true }}
+                slotProps={{ select: { multiple: true } }}
                 fullWidth
               >
                 {roles.map((r) => (
@@ -437,7 +437,7 @@ export default function UsersPage() {
               </TextField>
             </Grid>
             {isCustomerOnly && (
-              <Grid item xs={12}>
+              <Grid size={{ xs: 12 }}>
                 <TextField
                   select
                   label="Zákazník"
@@ -455,7 +455,7 @@ export default function UsersPage() {
                 </TextField>
               </Grid>
             )}
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <TextField
                 select
                 label="Přiřazené společnosti"
@@ -467,7 +467,7 @@ export default function UsersPage() {
                       typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value,
                   }))
                 }
-                SelectProps={{ multiple: true }}
+                slotProps={{ select: { multiple: true } }}
                 fullWidth
                 helperText="Bez přiřazení vidí uživatel data všech společností."
               >
@@ -478,7 +478,7 @@ export default function UsersPage() {
                 ))}
               </TextField>
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <FormControlLabel
                 control={
                   <Switch
@@ -510,7 +510,7 @@ export default function UsersPage() {
               />
             </Grid>
             {!editing && (
-              <Grid item xs={12}>
+              <Grid size={{ xs: 12 }}>
                 <FormControlLabel
                   control={
                     <Checkbox

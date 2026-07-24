@@ -8,7 +8,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Grid,
   IconButton,
   LinearProgress,
   Table,
@@ -20,6 +19,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import client from '../api/client';
 import SearchFilterBar from './SearchFilterBar';
@@ -41,7 +41,7 @@ function ItemPreviewDialog({ item, onClose }) {
 
   useEffect(() => {
     setImageUrl('');
-    if (!item || !item.hasImage) return;
+    if (!item?.hasImage) return;
     let url = '';
     client
       .get(`/items/${item.id}/image`, { responseType: 'blob' })
@@ -49,7 +49,7 @@ function ItemPreviewDialog({ item, onClose }) {
         url = URL.createObjectURL(res.data);
         setImageUrl(url);
       })
-      .catch(() => {});
+      .catch(() => setImageUrl(''));
     return () => {
       if (url) URL.revokeObjectURL(url);
     };
@@ -60,7 +60,7 @@ function ItemPreviewDialog({ item, onClose }) {
       <DialogTitle>Karta zboží {item?.code}</DialogTitle>
       <DialogContent dividers>
         <Grid container spacing={2}>
-          <Grid item xs={12} sx={{ textAlign: 'center' }}>
+          <Grid size={{ xs: 12 }} sx={{ textAlign: 'center' }}>
             {imageUrl ? (
               <Box
                 component="img"
@@ -82,31 +82,31 @@ function ItemPreviewDialog({ item, onClose }) {
               </Typography>
             )}
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <Typography variant="body2" color="text.secondary">
               Název
             </Typography>
             <Typography>{item?.name}</Typography>
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <Typography variant="body2" color="text.secondary">
               Typ
             </Typography>
             <Typography>{item?.itemType === 'SERVICE' ? 'Služba' : 'Zboží'}</Typography>
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <Typography variant="body2" color="text.secondary">
               Kategorie
             </Typography>
             <Typography>{item?.categoryName || '—'}</Typography>
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <Typography variant="body2" color="text.secondary">
               Jednotka
             </Typography>
             <Typography>{item?.unit || '—'}</Typography>
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <Typography variant="body2" color="text.secondary">
               Cena
             </Typography>
@@ -114,14 +114,14 @@ function ItemPreviewDialog({ item, onClose }) {
               {item?.price ? formatMoney(item.price.price, item.price.currency) : '—'}
             </Typography>
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <Typography variant="body2" color="text.secondary">
               Sazba DPH
             </Typography>
             <Typography>{item?.price?.vatRate != null ? `${item.price.vatRate} %` : '—'}</Typography>
           </Grid>
           {item?.description && (
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <Typography variant="body2" color="text.secondary">
                 Popis
               </Typography>
@@ -311,7 +311,7 @@ export default function ItemPickerDialog({ open, onClose, onAdd }) {
           onPageChange={(_, p) => setPage(p)}
           rowsPerPage={size}
           onRowsPerPageChange={(e) => {
-            setSize(parseInt(e.target.value, 10));
+            setSize(Number.parseInt(e.target.value, 10));
             setPage(0);
           }}
           rowsPerPageOptions={[5, 10, 25]}

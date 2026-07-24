@@ -9,7 +9,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Grid,
   IconButton,
   LinearProgress,
   MenuItem,
@@ -26,6 +25,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -68,7 +68,7 @@ const SEARCH_FIELDS = [
 const READ_ONLY_STATUS = 'IN_PROGRESS';
 
 // Statuses from which an order can still be created.
-const CONVERTIBLE_STATUSES = ['NEW', 'SENT', 'ACCEPTED'];
+const CONVERTIBLE_STATUSES = new Set(['NEW', 'SENT', 'ACCEPTED']);
 
 // Manual status transitions offered in the list.
 const NEXT_STATUSES = {
@@ -130,7 +130,7 @@ function QuotationRow({ quotation, onStatusChange, onEdit, onSendEmail, onCreate
               </IconButton>
             </Tooltip>
           )}
-          {CONVERTIBLE_STATUSES.includes(quotation.status) && !quotation.orderId && (
+          {CONVERTIBLE_STATUSES.has(quotation.status) && !quotation.orderId && (
             <Tooltip title="Vytvořit objednávku z nabídky">
               <IconButton size="small" color="primary" onClick={() => onCreateOrder(quotation)}>
                 <ShoppingCartIcon fontSize="small" />
@@ -188,6 +188,38 @@ function QuotationRow({ quotation, onStatusChange, onEdit, onSendEmail, onCreate
 
 const EMPTY_ITEM_ROW = { itemId: '', quantity: 1, unitPrice: '', totalPrice: '' };
 
+// Editable item row with a stable identity for React keys.
+const newItemRow = (row = {}) => ({ ...EMPTY_ITEM_ROW, rowId: crypto.randomUUID(), ...row });
+
+// Computes quantity × unit price, or '' when either value is missing/invalid.
+const computeTotal = (quantity, unitPrice) => {
+  const q = Number(quantity);
+  const p = Number(unitPrice);
+  if (quantity === '' || unitPrice === '' || Number.isNaN(q) || Number.isNaN(p)) return '';
+  return String(Math.round(q * p * 100) / 100);
+};
+
+// Merges the picked items into the item list without duplicates.
+const mergeItems = (list, picked) =>
+  [...list, ...picked.filter((p) => !list.some((i) => i.id === p.id))];
+
+// Appends the picked items as new rows; already present items are skipped
+// and blank rows are dropped.
+const appendPickedRows = (rows, picked) => {
+  const kept = rows.filter((r) => r.itemId);
+  const added = picked
+    .filter((p) => !kept.some((r) => r.itemId === p.id))
+    .map((p) =>
+      newItemRow({
+        itemId: p.id,
+        unitPrice: p.price?.price ?? '',
+        totalPrice: computeTotal(EMPTY_ITEM_ROW.quantity, p.price?.price ?? ''),
+      })
+    );
+  const next = [...kept, ...added];
+  return next.length > 0 ? next : [newItemRow()];
+};
+
 /**
  * Dialog for creating a new quotation or editing an existing one. The mechanism is
  * the same as for orders, except that the unit price or the line total of each item
@@ -206,7 +238,7 @@ function QuotationFormDialog({ open, quotation, onClose, onSaved }) {
     validUntil: '',
     currency: 'CZK',
     note: '',
-    items: [{ ...EMPTY_ITEM_ROW }],
+    items: [newItemRow()],
   });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -226,13 +258,15 @@ function QuotationFormDialog({ open, quotation, onClose, onSaved }) {
             note: quotation.note || '',
             items:
               (quotation.items || []).length > 0
-                ? quotation.items.map((i) => ({
-                    itemId: i.itemId || '',
-                    quantity: i.quantity,
-                    unitPrice: i.unitPrice ?? '',
-                    totalPrice: i.totalPrice ?? '',
-                  }))
-                : [{ ...EMPTY_ITEM_ROW }],
+                ? quotation.items.map((i) =>
+                    newItemRow({
+                      itemId: i.itemId || '',
+                      quantity: i.quantity,
+                      unitPrice: i.unitPrice ?? '',
+                      totalPrice: i.totalPrice ?? '',
+                    })
+                  )
+                : [newItemRow()],
           }
         : {
             customerId: '',
@@ -241,7 +275,7 @@ function QuotationFormDialog({ open, quotation, onClose, onSaved }) {
             validUntil: '',
             currency: 'CZK',
             note: '',
-            items: [{ ...EMPTY_ITEM_ROW }],
+            items: [newItemRow()],
           }
     );
     client
@@ -258,50 +292,27 @@ function QuotationFormDialog({ open, quotation, onClose, onSaved }) {
       .catch(() => setItems([]));
   }, [open, quotation]);
 
-  // Computes quantity × unit price, or '' when either value is missing/invalid.
-  const computeTotal = (quantity, unitPrice) => {
-    const q = Number(quantity);
-    const p = Number(unitPrice);
-    if (quantity === '' || unitPrice === '' || Number.isNaN(q) || Number.isNaN(p)) return '';
-    return String(Math.round(q * p * 100) / 100);
+  const setItemRow = (rowId, field, value) => {
+    // Selecting an item prefills the unit price from its current price list entry.
+    const pickedItem = field === 'itemId' ? items.find((it) => it.id === value) : null;
+    const updateRow = (row) => {
+      if (row.rowId !== rowId) return row;
+      const next = { ...row, [field]: value };
+      if (field === 'itemId') {
+        next.unitPrice = pickedItem?.price?.price ?? '';
+      }
+      // Any change of item, quantity or unit price recomputes the line total.
+      if (field === 'itemId' || field === 'quantity' || field === 'unitPrice') {
+        next.totalPrice = computeTotal(next.quantity, next.unitPrice);
+      }
+      return next;
+    };
+    setForm((f) => ({ ...f, items: f.items.map(updateRow) }));
   };
 
-  const setItemRow = (idx, field, value) =>
-    setForm((f) => ({
-      ...f,
-      items: f.items.map((row, i) => {
-        if (i !== idx) return row;
-        const next = { ...row, [field]: value };
-        // Selecting an item prefills the unit price from its current price list entry.
-        if (field === 'itemId') {
-          const item = items.find((it) => it.id === value);
-          next.unitPrice = item?.price?.price ?? '';
-        }
-        // Any change of item, quantity or unit price recomputes the line total.
-        if (field === 'itemId' || field === 'quantity' || field === 'unitPrice') {
-          next.totalPrice = computeTotal(next.quantity, next.unitPrice);
-        }
-        return next;
-      }),
-    }));
-
-  // Adds the items picked in the search dialog as new rows; already present
-  // items are skipped and blank rows are dropped.
   const handlePicked = (picked) => {
-    setItems((list) => [...list, ...picked.filter((p) => !list.some((i) => i.id === p.id))]);
-    setForm((f) => {
-      const kept = f.items.filter((r) => r.itemId);
-      const added = picked
-        .filter((p) => !kept.some((r) => r.itemId === p.id))
-        .map((p) => ({
-          ...EMPTY_ITEM_ROW,
-          itemId: p.id,
-          unitPrice: p.price?.price ?? '',
-          totalPrice: computeTotal(EMPTY_ITEM_ROW.quantity, p.price?.price ?? ''),
-        }));
-      const next = [...kept, ...added];
-      return { ...f, items: next.length > 0 ? next : [{ ...EMPTY_ITEM_ROW }] };
-    });
+    setItems((list) => mergeItems(list, picked));
+    setForm((f) => ({ ...f, items: appendPickedRows(f.items, picked) }));
   };
 
   const handleSave = async () => {
@@ -348,6 +359,11 @@ function QuotationFormDialog({ open, quotation, onClose, onSaved }) {
     }
   };
 
+  const removeItemRow = (rowId) =>
+    setForm((f) => ({ ...f, items: f.items.filter((r) => r.rowId !== rowId) }));
+
+  const saveLabel = quotation ? 'Uložit' : 'Vytvořit';
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
@@ -360,7 +376,7 @@ function QuotationFormDialog({ open, quotation, onClose, onSaved }) {
           </Alert>
         )}
         <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               select
               label="Zákazník"
@@ -376,7 +392,7 @@ function QuotationFormDialog({ open, quotation, onClose, onSaved }) {
               ))}
             </TextField>
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               select
               label="Obchodní zástupce"
@@ -392,7 +408,7 @@ function QuotationFormDialog({ open, quotation, onClose, onSaved }) {
               ))}
             </TextField>
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField
               label="Datum nabídky"
               type="date"
@@ -400,20 +416,20 @@ function QuotationFormDialog({ open, quotation, onClose, onSaved }) {
               onChange={(e) => setForm((f) => ({ ...f, quotationDate: e.target.value }))}
               required
               fullWidth
-              InputLabelProps={{ shrink: true }}
+              slotProps={{ inputLabel: { shrink: true } }}
             />
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField
               label="Platnost do"
               type="date"
               value={form.validUntil}
               onChange={(e) => setForm((f) => ({ ...f, validUntil: e.target.value }))}
               fullWidth
-              InputLabelProps={{ shrink: true }}
+              slotProps={{ inputLabel: { shrink: true } }}
             />
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <TextField
               select
               label="Měna"
@@ -429,21 +445,21 @@ function QuotationFormDialog({ open, quotation, onClose, onSaved }) {
             </TextField>
           </Grid>
 
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Typography variant="subtitle2">Položky</Typography>
             <Typography variant="caption" color="text.secondary">
               Prázdná cena/ks znamená aktuální cenu z ceníku, prázdné celkem se dopočítá jako
               množství × cena/ks.
             </Typography>
           </Grid>
-          {form.items.map((row, idx) => (
-            <Grid item xs={12} key={idx}>
+          {form.items.map((row) => (
+            <Grid size={{ xs: 12 }} key={row.rowId}>
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                 <TextField
                   select
                   label="Položka"
                   value={row.itemId}
-                  onChange={(e) => setItemRow(idx, 'itemId', e.target.value)}
+                  onChange={(e) => setItemRow(row.rowId, 'itemId', e.target.value)}
                   sx={{ flexGrow: 1 }}
                   size="small"
                 >
@@ -461,8 +477,8 @@ function QuotationFormDialog({ open, quotation, onClose, onSaved }) {
                   type="number"
                   size="small"
                   value={row.quantity}
-                  onChange={(e) => setItemRow(idx, 'quantity', e.target.value)}
-                  inputProps={{ min: 1 }}
+                  onChange={(e) => setItemRow(row.rowId, 'quantity', e.target.value)}
+                  slotProps={{ htmlInput: { min: 1 } }}
                   sx={{ width: 100 }}
                 />
                 <TextField
@@ -470,8 +486,8 @@ function QuotationFormDialog({ open, quotation, onClose, onSaved }) {
                   type="number"
                   size="small"
                   value={row.unitPrice}
-                  onChange={(e) => setItemRow(idx, 'unitPrice', e.target.value)}
-                  inputProps={{ min: 0, step: 0.01 }}
+                  onChange={(e) => setItemRow(row.rowId, 'unitPrice', e.target.value)}
+                  slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
                   sx={{ width: 130 }}
                 />
                 <TextField
@@ -479,14 +495,12 @@ function QuotationFormDialog({ open, quotation, onClose, onSaved }) {
                   type="number"
                   size="small"
                   value={row.totalPrice}
-                  onChange={(e) => setItemRow(idx, 'totalPrice', e.target.value)}
-                  inputProps={{ min: 0, step: 0.01 }}
+                  onChange={(e) => setItemRow(row.rowId, 'totalPrice', e.target.value)}
+                  slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
                   sx={{ width: 130 }}
                 />
                 <IconButton
-                  onClick={() =>
-                    setForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== idx) }))
-                  }
+                  onClick={() => removeItemRow(row.rowId)}
                   disabled={form.items.length === 1}
                 >
                   <DeleteIcon />
@@ -494,12 +508,12 @@ function QuotationFormDialog({ open, quotation, onClose, onSaved }) {
               </Box>
             </Grid>
           ))}
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Button
               size="small"
               startIcon={<AddIcon />}
               onClick={() =>
-                setForm((f) => ({ ...f, items: [...f.items, { ...EMPTY_ITEM_ROW }] }))
+                setForm((f) => ({ ...f, items: [...f.items, newItemRow()] }))
               }
             >
               Přidat položku
@@ -508,7 +522,7 @@ function QuotationFormDialog({ open, quotation, onClose, onSaved }) {
               Vyhledat zboží
             </Button>
           </Grid>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <TextField
               label="Poznámka"
               value={form.note}
@@ -528,7 +542,7 @@ function QuotationFormDialog({ open, quotation, onClose, onSaved }) {
       <DialogActions>
         <Button onClick={onClose}>Zrušit</Button>
         <Button variant="contained" onClick={handleSave} disabled={saving}>
-          {saving ? 'Ukládám…' : quotation ? 'Uložit' : 'Vytvořit'}
+          {saving ? 'Ukládám…' : saveLabel}
         </Button>
       </DialogActions>
     </Dialog>
@@ -675,7 +689,7 @@ export default function QuotationsPage() {
           onPageChange={(_, p) => setPage(p)}
           rowsPerPage={size}
           onRowsPerPageChange={(e) => {
-            setSize(parseInt(e.target.value, 10));
+            setSize(Number.parseInt(e.target.value, 10));
             setPage(0);
           }}
           rowsPerPageOptions={[10, 25, 50]}

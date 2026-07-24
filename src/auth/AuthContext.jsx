@@ -36,7 +36,7 @@ export function AuthProvider({ children }) {
     } catch (e) {
       // The backend "local" profile uses in-memory users that are not present in the DB,
       // so /users/me returns 404 while the credentials are valid (invalid ones yield 401).
-      if (e.response && e.response.status === 404 && usernameHint) {
+      if (e.response?.status === 404 && usernameHint) {
         const roleByUsername = {
           owner: 'OWNER',
           rep: 'SALES_REPRESENTATIVE',
@@ -107,7 +107,8 @@ export function AuthProvider({ children }) {
 
   const loginBasic = useCallback(
     async (username, password) => {
-      const header = `Basic ${btoa(`${username}:${password}`)}`;
+      const credentials = btoa(`${username}:${password}`);
+      const header = `Basic ${credentials}`;
       setAuthHeader(header);
       try {
         const me = await loadCurrentUser(username);
@@ -115,14 +116,14 @@ export function AuthProvider({ children }) {
         // exists in the DB) and refuse disabled or locked accounts client-side
         // as well; mustChangePassword / credentialsExpired are handled by the
         // forced password-change dialog in App.
-        if (me && me.enabled === false) {
+        if (me?.enabled === false) {
           setAuthHeader(null);
           setUser(null);
           const err = new Error('Account is disabled');
           err.accountFlag = 'disabled';
           throw err;
         }
-        if (me && me.locked === true) {
+        if (me?.locked === true) {
           setAuthHeader(null);
           setUser(null);
           const err = new Error('Account is locked');

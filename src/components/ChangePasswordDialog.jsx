@@ -58,7 +58,7 @@ export default function ChangePasswordDialog({ open, forced = false, onClose, on
       });
       onChanged?.();
     } catch (err) {
-      if (err.response && err.response.status === 400) {
+      if (err.response?.status === 400) {
         setError('Původní heslo není správné, nebo nové heslo nesplňuje politiku hesel.');
       } else {
         setError('Změnu hesla se nepodařilo provést.');

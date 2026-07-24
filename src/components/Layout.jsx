@@ -63,7 +63,7 @@ function CompanyLogo({ companyId }) {
     client
       .get(`/companies/${companyId}/logo`, { responseType: 'blob' })
       .then((res) => {
-        if (!cancelled && res.data && res.data.size > 0) {
+        if (!cancelled && res.data?.size > 0) {
           objectUrl = URL.createObjectURL(res.data);
           setUrl(objectUrl);
         }

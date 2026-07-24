@@ -9,7 +9,6 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
-  Grid,
   IconButton,
   LinearProgress,
   Paper,
@@ -23,6 +22,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import Grid from '@mui/material/Grid2';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import PrintIcon from '@mui/icons-material/Print';
 import EmailIcon from '@mui/icons-material/Email';
@@ -55,7 +55,7 @@ const SEARCH_FIELDS = [
 function InvoiceDetailDialog({ invoice, onClose, onPrint, onSend, sending, canSend }) {
   if (!invoice) return null;
   const field = (label, value) => (
-    <Grid item xs={12} sm={6} md={4}>
+    <Grid size={{ xs: 12, sm: 6, md: 4 }}>
       <Typography variant="caption" color="text.secondary">
         {label}
       </Typography>

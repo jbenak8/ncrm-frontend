@@ -8,7 +8,7 @@ export function isPasswordValid(password) {
   return (
     /[A-Z]/.test(password) &&
     /[a-z]/.test(password) &&
-    /[0-9]/.test(password) &&
+    /\d/.test(password) &&
     /[^A-Za-z0-9]/.test(password)
   );
 }
