@@ -25,6 +25,8 @@ import client from '../api/client';
 
 const ALLOWED_LOGO_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml'];
 const MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024;
+const ALLOWED_STAMP_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml'];
+const MAX_STAMP_SIZE_BYTES = 2 * 1024 * 1024;
 
 const emptyAddress = {
   street: '',
@@ -58,8 +60,8 @@ const emptyForm = {
 /**
  * Create / edit own company dialog with ARES lookup: after entering the registration id (IČO)
  * the "ARES" button fills in name, VAT id and address (including the orientation number) from
- * the registry. The logo can be uploaded (PNG/JPEG/GIF/WebP/SVG, max 2 MB) or removed; the file
- * is sent to the logo endpoint after the company itself is saved.
+ * the registry. The logo and the stamp can be uploaded (PNG/JPEG/GIF/WebP/SVG, max 2 MB) or
+ * removed; the files are sent to their endpoints after the company itself is saved.
  */
 export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
   const [form, setForm] = useState(emptyForm);
@@ -71,6 +73,9 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState('');
   const [logoRemoved, setLogoRemoved] = useState(false);
+  const [stampFile, setStampFile] = useState(null);
+  const [stampPreview, setStampPreview] = useState('');
+  const [stampRemoved, setStampRemoved] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -122,6 +127,25 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
         setLogoPreview(url);
       })
       .catch(() => setLogoPreview(''));
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [open, company]);
+
+  useEffect(() => {
+    if (!open) return;
+    setStampFile(null);
+    setStampRemoved(false);
+    setStampPreview('');
+    if (!company?.hasStamp) return;
+    let url = '';
+    client
+      .get(`/companies/${company.id}/stamp`, { responseType: 'blob' })
+      .then((res) => {
+        url = URL.createObjectURL(res.data);
+        setStampPreview(url);
+      })
+      .catch(() => setStampPreview(''));
     return () => {
       if (url) URL.revokeObjectURL(url);
     };
@@ -186,6 +210,30 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
     setLogoRemoved(true);
   };
 
+  const handleStampSelect = (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!ALLOWED_STAMP_TYPES.includes(file.type)) {
+      setError('Razítko musí být obrázek PNG, JPEG, GIF, WebP nebo SVG.');
+      return;
+    }
+    if (file.size > MAX_STAMP_SIZE_BYTES) {
+      setError('Razítko může mít maximálně 2 MB.');
+      return;
+    }
+    setError('');
+    setStampFile(file);
+    setStampRemoved(false);
+    setStampPreview(URL.createObjectURL(file));
+  };
+
+  const handleStampRemove = () => {
+    setStampFile(null);
+    setStampPreview('');
+    setStampRemoved(true);
+  };
+
   const handleSave = async () => {
     if (!form.name.trim() || !form.registrationId.trim()) {
       setError('Název a IČO jsou povinné.');
@@ -210,6 +258,22 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
         }
       } catch (e) {
         setError('Společnost byla uložena, ale změna loga se nezdařila.');
+        onSaved(data);
+        return;
+      }
+      try {
+        if (stampFile) {
+          const formData = new FormData();
+          formData.append('file', stampFile);
+          ({ data } = await client.put(`/companies/${data.id}/stamp`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          }));
+        } else if (stampRemoved && company?.hasStamp) {
+          await client.delete(`/companies/${data.id}/stamp`);
+          data = { ...data, hasStamp: false };
+        }
+      } catch (e) {
+        setError('Společnost byla uložena, ale změna razítka se nezdařila.');
         onSaved(data);
         return;
       }
@@ -468,6 +532,60 @@ export default function CompanyFormDialog({ open, company, onClose, onSaved }) {
                   color="error"
                   startIcon={<DeleteOutlineIcon />}
                   onClick={handleLogoRemove}
+                >
+                  Odebrat
+                </Button>
+              )}
+              <Typography variant="caption" color="text.secondary">
+                PNG, JPEG, GIF, WebP nebo SVG, max. 2 MB
+              </Typography>
+            </Box>
+          </Grid>
+
+          <Grid size={{ xs: 12 }}>
+            <Divider>
+              <Typography variant="caption" color="text.secondary">
+                Razítko
+              </Typography>
+            </Divider>
+          </Grid>
+          <Grid size={{ xs: 12 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              {stampPreview ? (
+                <Box
+                  component="img"
+                  src={stampPreview}
+                  alt="Razítko společnosti"
+                  sx={{
+                    maxHeight: 64,
+                    maxWidth: 160,
+                    objectFit: 'contain',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 1,
+                    p: 0.5,
+                  }}
+                />
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  Žádné razítko
+                </Typography>
+              )}
+              <Button component="label" size="small" startIcon={<UploadFileIcon />}>
+                {'Nahrát razítko'}
+                <input
+                  type="file"
+                  hidden
+                  accept={ALLOWED_STAMP_TYPES.join(',')}
+                  onChange={handleStampSelect}
+                />
+              </Button>
+              {stampPreview && (
+                <Button
+                  size="small"
+                  color="error"
+                  startIcon={<DeleteOutlineIcon />}
+                  onClick={handleStampRemove}
                 >
                   Odebrat
                 </Button>
