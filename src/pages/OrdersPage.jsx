@@ -3,12 +3,14 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Chip,
   Collapse,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   Grid,
   IconButton,
   LinearProgress,
@@ -30,6 +32,7 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import SearchIcon from '@mui/icons-material/Search';
 import PrintIcon from '@mui/icons-material/Print';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
@@ -76,7 +79,7 @@ const NEXT_STATUSES = {
   CANCELLED: [],
 };
 
-function OrderRow({ order, onStatusChange, onEditItems, onPrint, onIssueInvoice }) {
+function OrderRow({ order, onStatusChange, onEditItems, onPrint, onIssueInvoice, onAssignRep, readOnly }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -100,24 +103,34 @@ function OrderRow({ order, onStatusChange, onEditItems, onPrint, onIssueInvoice 
           />
         </TableCell>
         <TableCell align="right">
-          {(NEXT_STATUSES[order.status] || []).map((s) => (
-            <Button
-              key={s}
-              size="small"
-              color={s === 'CANCELLED' ? 'error' : 'primary'}
-              onClick={() => onStatusChange(order, s)}
-            >
-              {ORDER_STATUS_LABELS[s]}
-            </Button>
-          ))}
-          {EDITABLE_STATUSES.includes(order.status) && (
+          {/* Zákazník objednávky pouze prohlíží a tiskne; stavy, položky a fakturaci
+              spravuje vlastník / obchodní zástupce. */}
+          {!readOnly &&
+            (NEXT_STATUSES[order.status] || []).map((s) => (
+              <Button
+                key={s}
+                size="small"
+                color={s === 'CANCELLED' ? 'error' : 'primary'}
+                onClick={() => onStatusChange(order, s)}
+              >
+                {ORDER_STATUS_LABELS[s]}
+              </Button>
+            ))}
+          {!readOnly && EDITABLE_STATUSES.includes(order.status) && (
             <Tooltip title="Upravit položky objednávky">
               <IconButton size="small" onClick={() => onEditItems(order)}>
                 <EditIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           )}
-          {order.status === 'COMPLETED' && (
+          {!readOnly && !order.salesRepresentativeId && (
+            <Tooltip title="Přiřadit obchodního zástupce">
+              <IconButton size="small" color="primary" onClick={() => onAssignRep(order)}>
+                <PersonAddIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+          {!readOnly && order.status === 'COMPLETED' && (
             <Tooltip title="Vystavit fakturu">
               <IconButton size="small" color="primary" onClick={() => onIssueInvoice(order)}>
                 <ReceiptLongIcon fontSize="small" />
@@ -317,6 +330,104 @@ function EditOrderItemsDialog({ order, onClose, onSaved }) {
         <Button onClick={onClose}>Zrušit</Button>
         <Button variant="contained" onClick={handleSave} disabled={saving}>
           {saving ? 'Ukládám…' : 'Uložit'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+/**
+ * Dialog for assigning a sales representative to an order that has none yet.
+ * Vlastník / administrátor může vybrat libovolného obchodního zástupce,
+ * obchodní zástupce může přiřadit pouze sám sebe. The backend accepts only a
+ * full order update, so the unchanged order fields are sent along with the
+ * chosen sales representative to `PUT /orders/{id}`.
+ */
+function AssignRepDialog({ order, onClose, onSaved }) {
+  const { user, isOwner } = useAuth();
+  const [reps, setReps] = useState([]);
+  const [repId, setRepId] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!order) return;
+    setError('');
+    if (isOwner) {
+      setRepId('');
+      client
+        .get('/users/sales-representatives')
+        .then((res) => setReps(res.data))
+        .catch(() => setReps([]));
+    } else {
+      // Obchodní zástupce může přiřadit pouze sám sebe.
+      setReps(user ? [user] : []);
+      setRepId(user?.id || '');
+    }
+  }, [order, isOwner, user]);
+
+  const handleAssign = async () => {
+    if (!repId) {
+      setError('Vyberte obchodního zástupce.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      // The backend accepts only a full order update, so the unchanged header
+      // fields are sent along with the assigned sales representative.
+      const { data } = await client.put(`/orders/${order.id}`, {
+        customerId: order.customerId,
+        companyId: order.companyId || null,
+        contactPersonId: order.contactPersonId || null,
+        salesRepresentativeId: repId,
+        orderDate: order.orderDate,
+        currency: order.currency,
+        note: order.note || null,
+        items: (order.items || [])
+          .filter((i) => i.itemId)
+          .map((i) => ({ itemId: i.itemId, quantity: i.quantity })),
+      });
+      onSaved(data);
+      onClose();
+    } catch {
+      setError('Přiřazení obchodního zástupce se nezdařilo.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={!!order} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>Přiřadit obchodního zástupce k objednávce {order?.orderNumber}</DialogTitle>
+      <DialogContent dividers>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+        <TextField
+          select
+          label="Obchodní zástupce"
+          value={repId}
+          onChange={(e) => setRepId(e.target.value)}
+          required
+          fullWidth
+          disabled={!isOwner}
+          helperText={!isOwner ? 'Jako obchodní zástupce můžete přiřadit pouze sám sebe.' : undefined}
+          sx={{ mt: 1 }}
+        >
+          {reps.map((r) => (
+            <MenuItem key={r.id} value={r.id}>
+              {r.firstName} {r.lastName}
+            </MenuItem>
+          ))}
+        </TextField>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Zrušit</Button>
+        <Button variant="contained" onClick={handleAssign} disabled={saving}>
+          {saving ? 'Přiřazuji…' : 'Přiřadit'}
         </Button>
       </DialogActions>
     </Dialog>
@@ -738,8 +849,11 @@ function NewOrderDialog({ open, onClose, onSaved }) {
 
 export default function OrdersPage() {
   const { activeCompany } = useCompany() || {};
+  const { user, isCustomer } = useAuth();
   const [orders, setOrders] = useState([]);
   const [filters, setFilters] = useState([]);
+  // Zobrazit pouze objednávky bez přiřazeného obchodního zástupce.
+  const [onlyUnassigned, setOnlyUnassigned] = useState(false);
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(25);
   const [total, setTotal] = useState(0);
@@ -749,6 +863,7 @@ export default function OrdersPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState(null);
   const [invoicingOrder, setInvoicingOrder] = useState(null);
+  const [assigningOrder, setAssigningOrder] = useState(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -758,6 +873,11 @@ export default function OrdersPage() {
     params.set('sort', 'orderDate,desc');
     // The list is scoped to the currently selected own company.
     if (activeCompany) params.append('filter', `company.id:eq:${activeCompany.id}`);
+    // Zákazník vidí pouze objednávky svého zákaznického záznamu.
+    if (isCustomer && user?.customerId)
+      params.append('filter', `customer.id:eq:${user.customerId}`);
+    // Objednávky zadané zákazníky čekající na přiřazení obchodního zástupce.
+    if (onlyUnassigned) params.append('filter', 'salesRepresentative:isNull');
     filters.forEach((f) => params.append('filter', f));
     client
       .get('/orders/search', { params })
@@ -767,7 +887,7 @@ export default function OrdersPage() {
       })
       .catch(() => setError('Nepodařilo se načíst objednávky.'))
       .finally(() => setLoading(false));
-  }, [page, size, filters, activeCompany]);
+  }, [page, size, filters, onlyUnassigned, activeCompany, isCustomer, user]);
 
   useEffect(load, [load]);
 
@@ -822,6 +942,23 @@ export default function OrdersPage() {
         }}
       />
 
+      {/* Zákazníkovy objednávky zástupce nemají, filtr pro něj nemá smysl. */}
+      {!isCustomer && (
+        <FormControlLabel
+          sx={{ mb: 1 }}
+          control={
+            <Checkbox
+              checked={onlyUnassigned}
+              onChange={(e) => {
+                setOnlyUnassigned(e.target.checked);
+                setPage(0);
+              }}
+            />
+          }
+          label="Pouze nepřiřazené obchodnímu zástupci"
+        />
+      )}
+
       <TableContainer component={Paper}>
         {loading && <LinearProgress />}
         <Table size="small">
@@ -847,6 +984,8 @@ export default function OrdersPage() {
                 onEditItems={setEditingOrder}
                 onPrint={handlePrint}
                 onIssueInvoice={setInvoicingOrder}
+                onAssignRep={setAssigningOrder}
+                readOnly={isCustomer}
               />
             ))}
             {orders.length === 0 && !loading && (
@@ -880,6 +1019,16 @@ export default function OrdersPage() {
         onClose={() => setEditingOrder(null)}
         onSaved={() => {
           setSnack('Položky objednávky byly upraveny.');
+          load();
+        }}
+      />
+      <AssignRepDialog
+        order={assigningOrder}
+        onClose={() => setAssigningOrder(null)}
+        onSaved={(saved) => {
+          setSnack(
+            `Objednávce ${saved.orderNumber} byl přiřazen obchodní zástupce ${saved.salesRepresentativeName || ''}.`
+          );
           load();
         }}
       />

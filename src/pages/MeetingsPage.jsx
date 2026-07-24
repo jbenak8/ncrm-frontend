@@ -31,6 +31,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import dayjs from 'dayjs';
 import client from '../api/client';
+import { useAuth } from '../auth/AuthContext';
 import { useCompany } from '../company/CompanyContext';
 import SearchFilterBar from '../components/SearchFilterBar';
 import { formatDateTime, MEETING_STATUS_LABELS, STATUS_COLORS } from '../utils/format';
@@ -257,6 +258,7 @@ function CompleteDialog({ open, meeting, onClose, onCompleted }) {
 
 export default function MeetingsPage() {
   const { activeCompany } = useCompany() || {};
+  const { user, isCustomer } = useAuth();
   const [meetings, setMeetings] = useState([]);
   const [filters, setFilters] = useState([]);
   const [page, setPage] = useState(0);
@@ -277,6 +279,9 @@ export default function MeetingsPage() {
     params.set('sort', 'plannedDate,desc');
     // The list is scoped to the currently selected own company.
     if (activeCompany) params.append('filter', `company.id:eq:${activeCompany.id}`);
+    // Zákazník vidí pouze schůzky svého zákaznického záznamu.
+    if (isCustomer && user?.customerId)
+      params.append('filter', `customer.id:eq:${user.customerId}`);
     filters.forEach((f) => params.append('filter', f));
     client
       .get('/meetings/search', { params })
@@ -286,7 +291,7 @@ export default function MeetingsPage() {
       })
       .catch(() => setError('Nepodařilo se načíst schůzky.'))
       .finally(() => setLoading(false));
-  }, [page, size, filters, activeCompany]);
+  }, [page, size, filters, activeCompany, isCustomer, user]);
 
   useEffect(load, [load]);
 
@@ -307,16 +312,19 @@ export default function MeetingsPage() {
         <Typography variant="h5" fontWeight={700}>
           Schůzky
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => {
-            setEditing(null);
-            setFormOpen(true);
-          }}
-        >
-          Nová schůzka
-        </Button>
+        {/* Schůzky plánuje a spravuje vlastník / obchodní zástupce, zákazník je pouze prohlíží. */}
+        {!isCustomer && (
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => {
+              setEditing(null);
+              setFormOpen(true);
+            }}
+          >
+            Nová schůzka
+          </Button>
+        )}
       </Box>
 
       {error && (
@@ -364,7 +372,7 @@ export default function MeetingsPage() {
                 </TableCell>
                 <TableCell>{m.outcome || '—'}</TableCell>
                 <TableCell align="right">
-                  {['PLANNED', 'IN_PROGRESS'].includes(m.status) && (
+                  {!isCustomer && ['PLANNED', 'IN_PROGRESS'].includes(m.status) && (
                     <>
                       <Tooltip title="Upravit">
                         <IconButton

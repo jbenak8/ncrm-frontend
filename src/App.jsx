@@ -33,7 +33,8 @@ function FullScreenLoader() {
 }
 
 export default function App() {
-  const { initializing, isAuthenticated, isOwner, mustChangePassword, refreshUser } = useAuth();
+  const { initializing, isAuthenticated, isOwner, isCustomer, mustChangePassword, refreshUser } =
+    useAuth();
 
   if (initializing) {
     return <FullScreenLoader />;
@@ -62,14 +63,15 @@ export default function App() {
       <Layout>
         <Routes>
           <Route path="/" element={<DashboardPage />} />
-          <Route path="/customers" element={<CustomersPage />} />
-          <Route path="/customers/:id" element={<CustomerDetailPage />} />
-          <Route path="/quotations" element={<QuotationsPage />} />
+          {/* Zákazník má přístup pouze k dashboardu, objednávkám, fakturám a schůzkám. */}
+          {!isCustomer && <Route path="/customers" element={<CustomersPage />} />}
+          {!isCustomer && <Route path="/customers/:id" element={<CustomerDetailPage />} />}
+          {!isCustomer && <Route path="/quotations" element={<QuotationsPage />} />}
           <Route path="/orders" element={<OrdersPage />} />
           <Route path="/invoices" element={<InvoicesPage />} />
           <Route path="/meetings" element={<MeetingsPage />} />
-          <Route path="/items" element={<ItemsPage />} />
-          <Route path="/ai-chat" element={<AiChatPage />} />
+          {!isCustomer && <Route path="/items" element={<ItemsPage />} />}
+          {!isCustomer && <Route path="/ai-chat" element={<AiChatPage />} />}
           {isOwner && <Route path="/campaigns" element={<CampaignsPage />} />}
           {isOwner && <Route path="/users" element={<UsersPage />} />}
           {isOwner && <Route path="/admin/companies" element={<CompaniesPage />} />}
@@ -79,7 +81,7 @@ export default function App() {
           {isOwner && (
             <Route path="/admin/sales-representatives" element={<SalesRepresentativesPage />} />
           )}
-          <Route path="/reports" element={<ReportsPage />} />
+          {!isCustomer && <Route path="/reports" element={<ReportsPage />} />}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>
