@@ -21,11 +21,14 @@ import {
   Typography,
 } from '@mui/material';
 import Grid from '@mui/material/Grid2';
+import AddIcon from '@mui/icons-material/Add';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EditIcon from '@mui/icons-material/Edit';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import client from '../api/client';
+import ContactPersonFormDialog from '../components/ContactPersonFormDialog';
 import CustomerFormDialog from '../components/CustomerFormDialog';
+import SiteFormDialog from '../components/SiteFormDialog';
 import {
   formatDateTime,
   formatMoney,
@@ -51,6 +54,8 @@ export default function CustomerDetailPage() {
   const [error, setError] = useState('');
   const [snack, setSnack] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [contactDialogOpen, setContactDialogOpen] = useState(false);
+  const [siteDialogOpen, setSiteDialogOpen] = useState(false);
 
   const load = useCallback(() => {
     client
@@ -175,6 +180,15 @@ export default function CustomerDetailPage() {
 
           {tab === 0 && (
             <Card>
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', p: 1 }}>
+                <Button
+                  size="small"
+                  startIcon={<AddIcon />}
+                  onClick={() => setContactDialogOpen(true)}
+                >
+                  Přidat
+                </Button>
+              </Box>
               <Table size="small">
                 <TableHead>
                   <TableRow>
@@ -219,6 +233,15 @@ export default function CustomerDetailPage() {
 
           {tab === 1 && (
             <Card>
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', p: 1 }}>
+                <Button
+                  size="small"
+                  startIcon={<AddIcon />}
+                  onClick={() => setSiteDialogOpen(true)}
+                >
+                  Přidat
+                </Button>
+              </Box>
               <Table size="small">
                 <TableHead>
                   <TableRow>
@@ -343,6 +366,26 @@ export default function CustomerDetailPage() {
             onClose={() => setDialogOpen(false)}
             onSaved={() => {
               setSnack('Zákazník byl uložen.');
+              load();
+            }}
+          />
+
+          <ContactPersonFormDialog
+            open={contactDialogOpen}
+            customer={customer}
+            onClose={() => setContactDialogOpen(false)}
+            onSaved={() => {
+              setSnack('Kontaktní osoba byla přidána.');
+              load();
+            }}
+          />
+
+          <SiteFormDialog
+            open={siteDialogOpen}
+            customer={customer}
+            onClose={() => setSiteDialogOpen(false)}
+            onSaved={() => {
+              setSnack('Provozovna byla přidána.');
               load();
             }}
           />

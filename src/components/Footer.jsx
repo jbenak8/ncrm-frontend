@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Box, Typography } from '@mui/material';
+import { API_URL } from '../api/client';
 
 export default function Footer() {
   const [backendVersion, setBackendVersion] = useState(null);
 
   useEffect(() => {
     // The actuator info endpoint is public, so a plain fetch (no auth header) is enough.
-    fetch('/actuator/info')
+    fetch(`${API_URL}/actuator/info`)
       .then((response) => (response.ok ? response.json() : null))
       .then((info) => setBackendVersion(info?.version ?? null))
       .catch(() => setBackendVersion(null));

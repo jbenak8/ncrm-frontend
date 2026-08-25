@@ -12,6 +12,9 @@ sestaví produkční bundle Vite a výsledek servíruje **nginx** (image
   Změna vyžaduje nový build image.
 - **`BACKEND_URL` je runtime proměnná** — nginx přes ni proxuje `/api/*`
   a `/actuator/*` na backend (výchozí `http://ncrm-backend:8080`).
+- **`VITE_API_URL` je build-time proměnná pro standalone build** — pokud je
+  nastavená, frontend volá backend přímo na této adrese (bez proxy); prázdná
+  hodnota (výchozí) zachovává relativní volání přes proxy.
 - Kontejner vystavuje endpoint `GET /healthz` pro liveness/readiness probes.
 - SPA fallback: neznámé cesty vrací `index.html` (react-router).
 
@@ -84,3 +87,42 @@ gcloud run deploy ncrm-frontend \
 Pozn.: Cloud Run vyžaduje, aby `BACKEND_URL` mířila na veřejně dosažitelný
 backend (typicky druhá Cloud Run služba); alternativně lze frontend i backend
 provozovat v GKE a použít interní Service DNS jako na OpenShiftu.
+
+## 4. Standalone build (statický hosting)
+
+Varianta bez Dockeru a nginx proxy: produkční bundle se publikuje přímo
+v **rootu** libovolného statického hostingu (Apache/nginx webhosting, S3,
+Netlify, GitHub Pages, …). Adresa backendu se nastavuje při buildu proměnnou
+`VITE_API_URL` a zapéká se do bundle — frontend pak volá
+`{VITE_API_URL}/api/*` a `{VITE_API_URL}/actuator/*` přímo.
+
+```bash
+# Linux/macOS
+deploy/standalone/build.sh https://ncrm-backend.example.com
+```
+
+```powershell
+# Windows
+.\deploy\standalone\build.ps1 -BackendUrl https://ncrm-backend.example.com
+```
+
+Ekvivalentně ručně: `VITE_API_URL=https://ncrm-backend.example.com npm run build`
+(další `VITE_*` proměnné, např. `VITE_AUTH_MODE`, lze nastavit stejně).
+Výsledný obsah adresáře `dist/` nahrajte do rootu hostingu.
+
+Požadavky a omezení:
+
+- **CORS**: protože frontend a backend běží na různých doménách, backend musí
+  povolit CORS pro doménu frontendu (origin, hlavičky `Authorization`
+  a `Content-Type`, metody GET/POST/PUT/DELETE).
+- **SPA fallback**: hosting by měl neznámé cesty směrovat na `index.html`
+  (react-router). Např. pro Apache stačí `.htaccess`:
+
+  ```apacheconf
+  RewriteEngine On
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+  ```
+
+- Změna adresy backendu vyžaduje nový build (hodnota je zapečená v bundle).

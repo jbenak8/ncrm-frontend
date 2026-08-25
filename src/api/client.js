@@ -1,9 +1,14 @@
 import axios from 'axios';
 
+// Base URL of the backend. Empty by default: requests stay relative and go
+// through the dev server / nginx proxy. For standalone builds published on a
+// static hosting it is baked in at build time via VITE_API_URL.
+export const API_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
+
 // Axios instance used by the whole application. Authorization header is
 // injected by the AuthContext (Basic for the local profile, Bearer for Keycloak).
 const client = axios.create({
-  baseURL: '/api',
+  baseURL: `${API_URL}/api`,
 });
 
 let unauthorizedHandler = null;
