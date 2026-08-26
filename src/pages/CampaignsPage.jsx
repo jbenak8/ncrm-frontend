@@ -39,7 +39,24 @@ import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import client from '../api/client';
 import { useCompany } from '../company/CompanyContext';
 import SearchFilterBar from '../components/SearchFilterBar';
+import RichTextEditor from '../components/RichTextEditor';
 import { CAMPAIGN_STATUS_LABELS, formatDateTime, STATUS_COLORS } from '../utils/format';
+
+// True when the HTML body contains no visible content (text or an image).
+const isBodyEmpty = (html) => {
+  if (!html) return true;
+  if (/<img[\s>]/i.test(html)) return false;
+  return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim() === '';
+};
+
+// Converts plain text (e.g. AI output) to simple HTML for the WYSIWYG editor.
+const plainTextToHtml = (text) =>
+  /<[a-z][\s\S]*>/i.test(text)
+    ? text
+    : text
+        .split('\n')
+        .map((line) => (line.trim() === '' ? '<br />' : `<p>${line}</p>`))
+        .join('');
 
 // Fields of the generic campaign search API (filter=field:operator:value).
 const SEARCH_FIELDS = [
@@ -102,9 +119,13 @@ function CampaignRow({ campaign, onSend, onCancel }) {
           <Collapse in={open} timeout="auto" unmountOnExit>
             <Box sx={{ my: 1 }}>
               <Typography variant="subtitle2">Obsah</Typography>
-              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', mb: 1 }}>
-                {campaign.body}
-              </Typography>
+              <Typography
+                variant="body2"
+                component="div"
+                sx={{ mb: 1, '& img': { maxWidth: '100%' } }}
+                // The campaign body is authored as HTML in the WYSIWYG editor.
+                dangerouslySetInnerHTML={{ __html: campaign.body }}
+              />
               <Typography variant="subtitle2">Příjemci</Typography>
               <Table size="small">
                 <TableHead>
@@ -191,7 +212,11 @@ function NewCampaignDialog({ open, onClose, onSaved }) {
         language: 'cs',
         provider: ai.provider,
       });
-      setForm((f) => ({ ...f, body: data.content || '', contentSource: 'AI_GENERATED' }));
+      setForm((f) => ({
+        ...f,
+        body: plainTextToHtml(data.content || ''),
+        contentSource: 'AI_GENERATED',
+      }));
     } catch {
       setError('AI generování obsahu se nezdařilo.');
     } finally {
@@ -200,7 +225,7 @@ function NewCampaignDialog({ open, onClose, onSaved }) {
   };
 
   const handleSave = async () => {
-    if (!form.name.trim() || !form.subject.trim() || !form.body.trim() || form.customerIds.length === 0) {
+    if (!form.name.trim() || !form.subject.trim() || isBodyEmpty(form.body) || form.customerIds.length === 0) {
       setError('Vyplňte název, předmět, obsah a alespoň jednoho příjemce.');
       return;
     }
@@ -308,6 +333,8 @@ function NewCampaignDialog({ open, onClose, onSaved }) {
                   required
                   fullWidth
                   size="small"
+                  // The AI agent has access to real CRM data (catalogue, categories, orders).
+                  helperText="AI zná reálný sortiment, skupiny i objednávky – např. „toaletní papír o 5 % levnější“"
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 3 }}>
@@ -354,14 +381,11 @@ function NewCampaignDialog({ open, onClose, onSaved }) {
           )}
 
           <Grid size={{ xs: 12 }}>
-            <TextField
+            <RichTextEditor
               label="Obsah kampaně"
               value={form.body}
-              onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
+              onChange={(body) => setForm((f) => ({ ...f, body }))}
               required
-              fullWidth
-              multiline
-              minRows={8}
             />
           </Grid>
         </Grid>

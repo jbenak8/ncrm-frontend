@@ -16,11 +16,23 @@ import {
 } from '@mui/material';
 import Grid from '@mui/material/Grid2';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import client from '../api/client';
 import { useCompany } from '../company/CompanyContext';
 
 const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+
+// Simple toolbar of the WYSIWYG editor for the item description.
+const DESCRIPTION_EDITOR_MODULES = {
+  toolbar: [
+    ['bold', 'italic', 'underline'],
+    [{ list: 'ordered' }, { list: 'bullet' }],
+    ['link'],
+    ['clean'],
+  ],
+};
 const MAX_IMAGE_SIZE_BYTES = 2 * 1024 * 1024;
 
 const VAT_TYPE_LABELS = {
@@ -216,20 +228,41 @@ export default function ItemFormDialog({ open, item, categories, onClose, onSave
         )}
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, sm: 4 }}>
-            <TextField label="Kód" value={form.code} onChange={set('code')} required fullWidth />
+            <TextField
+              label="Kód"
+              value={form.code}
+              onChange={set('code')}
+              required
+              fullWidth
+              disabled={!!item}
+            />
           </Grid>
           <Grid size={{ xs: 12, sm: 8 }}>
             <TextField label="Název" value={form.name} onChange={set('name')} required fullWidth />
           </Grid>
           <Grid size={{ xs: 12 }}>
-            <TextField
-              label="Popis"
-              value={form.description}
-              onChange={set('description')}
-              fullWidth
-              multiline
-              minRows={2}
-            />
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+              Popis
+            </Typography>
+            <Box
+              sx={{
+                '& .ql-toolbar': { borderTopLeftRadius: 4, borderTopRightRadius: 4 },
+                '& .ql-container': {
+                  borderBottomLeftRadius: 4,
+                  borderBottomRightRadius: 4,
+                  fontFamily: 'inherit',
+                  fontSize: '1rem',
+                },
+                '& .ql-editor': { minHeight: 80 },
+              }}
+            >
+              <ReactQuill
+                theme="snow"
+                value={form.description}
+                onChange={(value) => setForm((f) => ({ ...f, description: value }))}
+                modules={DESCRIPTION_EDITOR_MODULES}
+              />
+            </Box>
           </Grid>
           <Grid size={{ xs: 12, sm: 4 }}>
             <TextField select label="Typ" value={form.itemType} onChange={set('itemType')} fullWidth>
