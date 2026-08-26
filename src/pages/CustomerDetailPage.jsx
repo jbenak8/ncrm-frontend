@@ -30,8 +30,10 @@ import ContactPersonFormDialog from '../components/ContactPersonFormDialog';
 import CustomerFormDialog from '../components/CustomerFormDialog';
 import SiteFormDialog from '../components/SiteFormDialog';
 import {
+  formatDate,
   formatDateTime,
   formatMoney,
+  INVOICE_PAYMENT_LABELS,
   MEETING_STATUS_LABELS,
   ORDER_STATUS_LABELS,
   STATUS_COLORS,
@@ -49,6 +51,7 @@ export default function CustomerDetailPage() {
   const navigate = useNavigate();
   const [customer, setCustomer] = useState(null);
   const [orders, setOrders] = useState([]);
+  const [invoices, setInvoices] = useState([]);
   const [meetings, setMeetings] = useState([]);
   const [tab, setTab] = useState(0);
   const [error, setError] = useState('');
@@ -66,6 +69,11 @@ export default function CustomerDetailPage() {
       .get(`/orders/by-customer/${id}`)
       .then((res) => setOrders(res.data))
       .catch(() => setOrders([]));
+    // The backend has no by-customer endpoint for invoices, filter the list on the client.
+    client
+      .get('/invoices')
+      .then((res) => setInvoices((res.data || []).filter((inv) => String(inv.customerId) === String(id))))
+      .catch(() => setInvoices([]));
     client
       .get(`/meetings/by-customer/${id}`)
       .then((res) => setMeetings(res.data))
@@ -175,6 +183,7 @@ export default function CustomerDetailPage() {
             <Tab label={`Kontaktní osoby (${customer.contactPersons?.length || 0})`} />
             <Tab label={`Provozovny (${customer.sites?.length || 0})`} />
             <Tab label={`Objednávky (${orders.length})`} />
+            <Tab label={`Faktury (${invoices.length})`} />
             <Tab label={`Schůzky (${meetings.length})`} />
           </Tabs>
 
@@ -321,6 +330,50 @@ export default function CustomerDetailPage() {
           )}
 
           {tab === 3 && (
+            <Card>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Číslo faktury</TableCell>
+                    <TableCell>Objednávka</TableCell>
+                    <TableCell>Platba</TableCell>
+                    <TableCell>Vystaveno</TableCell>
+                    <TableCell>Splatnost</TableCell>
+                    <TableCell align="right">Celkem s DPH</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {invoices.map((inv) => (
+                    <TableRow key={inv.id}>
+                      <TableCell>{inv.invoiceNumber}</TableCell>
+                      <TableCell>{inv.orderNumber}</TableCell>
+                      <TableCell>
+                        <Chip
+                          size="small"
+                          label={INVOICE_PAYMENT_LABELS[inv.paymentType] || inv.paymentType}
+                          color={inv.paymentType === 'TRANSFER' ? 'primary' : 'default'}
+                        />
+                      </TableCell>
+                      <TableCell>{formatDate(inv.issueDate)}</TableCell>
+                      <TableCell>{formatDate(inv.dueDate)}</TableCell>
+                      <TableCell align="right">{formatMoney(inv.totalGross, inv.currency)}</TableCell>
+                    </TableRow>
+                  ))}
+                  {invoices.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center">
+                        <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
+                          Žádné faktury.
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </Card>
+          )}
+
+          {tab === 4 && (
             <Card>
               <Table size="small">
                 <TableHead>

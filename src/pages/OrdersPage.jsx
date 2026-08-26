@@ -586,7 +586,8 @@ function NewOrderDialog({ open, onClose, onSaved }) {
     if (!isCustomer) {
       client
         .get('/customers', { params: { page: 0, size: 1000, sort: 'name,asc' } })
-        .then((res) => setCustomers(res.data.content || []))
+        // Inactive customers must not be offered in the customer picker.
+        .then((res) => setCustomers((res.data.content || []).filter((c) => c.active !== false)))
         .catch(() => setCustomers([]));
       client
         .get('/users/sales-representatives')
